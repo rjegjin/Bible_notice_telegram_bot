@@ -1,0 +1,7 @@
+pdfplumber==0.11.9
+Pillow==12.1.0
+protobuf==6.33.4
+python-dotenv==1.2.1
+python-telegram-bot==22.5
+schedule==1.2.2
+google-genai
