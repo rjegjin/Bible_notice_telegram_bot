@@ -13,9 +13,9 @@ def get_chapter_text(book_abbrev, chapter_str, lang_code='KO'):
     # [수정 1] 실제 DB에 존재하는 테이블 이름으로 연결
     # 초기 생성시 'bible'로 만들었으므로 KO는 'bible'로 매핑
     table_map = {
-        'KO': 'bible',     
-        'EN': 'bible_en', 
-        'MN': 'bible_mn'
+        'KO': 'bible_ko_KRV',
+        'EN': 'bible_en_ESV',
+        'MN': 'bible_mn_MUV'
     }
     
     # [수정 2] '시', '잠'을 각 DB에 저장된 실제 책 이름으로 변환 (DB Mapping)
@@ -23,8 +23,8 @@ def get_chapter_text(book_abbrev, chapter_str, lang_code='KO'):
     # 아래는 일반적인 txt 파일 기준 예시입니다.
     db_book_name_map = {
         'KO': {'시': '시', '잠': '잠'},
-        'EN': {'시': 'Ps', '잠': 'Prov'},  # 만약 DB에 'Ps'로 저장되어 있다면 'Ps'로 수정 필요
-        'MN': {'시': 'Дуу', '잠': 'Сур'}           # 몽골어 폴더명/파일명 기준
+        'EN': {'시': 'Ps', '잠': 'Prov'},
+        'MN': {'시': 'Дуу', '잠': 'Сур'}
     }
 
     # 출력용 제목 (헤더) 설정
@@ -34,7 +34,7 @@ def get_chapter_text(book_abbrev, chapter_str, lang_code='KO'):
         'MN': {'ver': 'MUV',      'full_name': {'시': 'Дуулал', '잠': 'Сургаалт үгс'}}
     }
 
-    target_table = table_map.get(lang_code, 'bible')
+    target_table = table_map.get(lang_code, 'bible_ko_KRV')
     
     # 해당 언어의 매핑이 없으면 기본값(한글) 사용
     lang_map = db_book_name_map.get(lang_code, db_book_name_map['KO'])
