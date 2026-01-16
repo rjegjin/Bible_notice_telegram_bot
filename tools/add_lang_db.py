@@ -8,7 +8,8 @@ TXT_FILE = 'ESV.txt'
 # 2. 저장할 테이블 이름 (영어: bible_en, 몽골어: bible_mn)
 LANG_TABLE = 'bible_en' 
 
-DB_FILE = 'bible.db'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_FILE = os.path.join(BASE_DIR, 'bible.db')
 
 def add_language_to_db():
     if not os.path.exists(TXT_FILE):

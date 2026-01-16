@@ -1,7 +1,11 @@
 import sqlite3
+import os
 
 def check_db_content():
-    conn = sqlite3.connect('bible.db')
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db_path = os.path.join(base_dir, 'bible.db')
+    
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
     # 1. 존재하는 테이블 목록 확인

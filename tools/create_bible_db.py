@@ -4,7 +4,9 @@ import os
 
 # --- 설정 ---
 TXT_FILE = '개역한글판성경.txt'
-DB_FILE = 'bible.db'
+# 현재 파일(tools/create_bible_db.py)의 상위 폴더(루트)를 기준으로 경로 설정
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_FILE = os.path.join(BASE_DIR, 'bible.db')
 
 def create_db():
     if not os.path.exists(TXT_FILE):

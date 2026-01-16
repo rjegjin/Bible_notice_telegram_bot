@@ -6,7 +6,8 @@ from bs4 import BeautifulSoup, NavigableString
 # --- 설정 ---
 # [수정됨] 사용자 경로 적용 (경로 앞의 r은 필수입니다)
 SOURCE_DIR = r"C:\Users\rjegj\OneDrive\Basic life\성경역본\mn_new"
-DB_FILE = 'bible.db'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_FILE = os.path.join(BASE_DIR, 'bible.db')
 LANG_TABLE = 'bible_mn'
 
 # 01~66 폴더 매핑
