@@ -1,10 +1,13 @@
 import json
 import os
 import asyncio
-import re  # 정규표현식 모듈 추가 (글자와 숫자 분리용)
-from datetime import datetime
+import re
+from datetime import datetime, timedelta  # [수정] timedelta 추가
 from telegram import Bot
 from dotenv import load_dotenv
+
+# [필수] bible_common.py가 같은 폴더에 있어야 합니다.
+from bible_common import get_chapter_text, split_text_for_telegram
 
 load_dotenv()
 
@@ -17,9 +20,7 @@ RECIPIENTS = {
     'MN': os.getenv('MN_CHAT_ID')
 }
 
-# --- [신규] 성경 약어 변환 사전 ---
-# JSON에 있는 한글 약어를 [영어, 몽골어]로 매핑합니다.
-# 몽골어 약어는 현지 성경(Ariun Bibl) 기준으로 수정이 필요할 수 있습니다.
+# --- 성경 약어 변환 사전 (Full List) ---
 BIBLE_MAP = {
     # --- 구약 (Old Testament) ---
     # 모세오경
@@ -109,6 +110,7 @@ BIBLE_MAP = {
     # 예언서
     '계': {'EN': 'Rev', 'MN': 'Илч'}
 }
+
 # --- 데이터 로드 ---
 def load_plan():
     file_path = os.path.join(os.path.dirname(__file__), 'bible_plan.json')
@@ -117,16 +119,15 @@ def load_plan():
             return json.load(f)
     return {}
 
-# --- [신규] 성경 구절 번역 함수 ---
+# --- 성경 구절 번역 함수 ---
 def translate_citation(text, lang_code):
     """
-    예: '마1-4' (KO) -> 'Matt 1-4' (EN) 변환
+    예: '마1-4' (KO) -> 'Matt 1-4' (EN) / 'Мат 1-4' (MN) 변환
     """
     if lang_code == 'KO' or not text:
         return text
 
-    # 정규식으로 '한글성경명'과 '장절숫자'를 분리
-    # 예: "삼상 1:1-18" -> match 1: "삼상", match 2: "1:1-18"
+    # 정규식으로 '한글성경명'과 '나머지(장절)' 분리
     match = re.match(r"([가-힣]+)\s*(.*)", text)
     
     if match:
@@ -138,83 +139,112 @@ def translate_citation(text, lang_code):
             book_trans = BIBLE_MAP[book_ko].get(lang_code, book_ko)
             return f"{book_trans} {numbers}".strip()
             
-    return text  # 번역 실패 시 원본 반환 (예: "수양회")
+    return text
 
-
+# --- 언어별 메시지 템플릿 ---
 translations = {
     'KO': {
         'title': "🌟 오늘의 묵상 알림",
-        'qt': "📖 [오늘의 QT 본문]",
-        'reading': "📚 [성경 읽기 진도]",
+        'qt_label': "📖 [오늘의 QT 본문]",
+        'rd_label': "📚 [성경 읽기 진도]",
         'nt': "신약", 'ps': "시편", 'pr': "잠언",
         'unit_ps': "편", 'unit_pr': "장", 'none': "주일(개인독서)",
         'slogan': "그리스도의 형상을 닮고 그의 형상을 닮게 하라"
     },
     'EN': {
         'title': "🌟 Daily Meditation",
-        'qt': "📖 [Today's QT Passage]",
-        'reading': "📚 [Bible Reading Plan]",
-        'nt': "New Testament", 'ps': "Psalms", 'pr': "Proverbs",
+        'qt_label': "📖 [Today's QT Passage]",
+        'rd_label': "📚 [Bible Reading Plan]",
+        'nt': "NT", 'ps': "Psalms", 'pr': "Proverbs",
         'unit_ps': "", 'unit_pr': "", 'none': "Sunday (Personal)",
-        'slogan': "Be formed in the image of Christ."
+        'slogan': "Be Like Christ, Make Like Christ."
     },
     'MN': {
         'title': "🌟 Өдрийн бясалгал",
-        'qt': "📖 [Өнөөдрийн QT]",
-        'reading': "📚 [Библи унших төлөвлөгөө]",
+        'qt_label': "📖 [Өнөөдрийн QT]",
+        'rd_label': "📚 [Библи унших төлөвлөгөө]",
         'nt': "Шинэ Гэрээ", 'ps': "Дуулал", 'pr': "Сургаалт үгс",
         'unit_ps': "-р бүлэг", 'unit_pr': "-р бүлэг", 'none': "Ням гараг",
-        'slogan': "Христийн дүр төрхийг дуурайж, Түүний дүр төрхтэй адил болтугай"
+        'slogan': "Христ шиг байж, Христ шиг болгоцгооё."
     }
 }
 
 async def broadcast_messages():
     if not TELEGRAM_TOKEN:
-        print("❌ 설정 오류: 텔레그램 토큰이 없습니다.")
+        print("❌ 설정 오류: TELEGRAM_TOKEN이 없습니다.")
         return
 
     bot = Bot(token=TELEGRAM_TOKEN)
-    now = datetime.now()
-    day_str = str(now.day)
+    
+    # --- [수정된 부분] 날짜 계산 로직 ---
+    # GitHub 서버(UTC) 기준이 아닌 한국 시간(KST = UTC+9) 기준으로 오늘 날짜 계산
+    kst_now = datetime.utcnow() + timedelta(hours=9)
+    day_str = str(kst_now.day)
+    # -----------------------------------
+    
+    # 테스트용 (필요시 주석 해제)
+    # day_str = "15"
 
     plan = load_plan()
     
     if day_str not in plan:
-        print(f"ℹ️ {day_str}일자 데이터가 없습니다. (전송 안 함)")
+        print(f"ℹ️ {day_str}일자 데이터가 없습니다.")
         return
 
-    # JSON 원본 데이터 (한글) 로드
+    # JSON 원본 데이터 (한글 기준) 로드
     raw_nt, raw_ps, raw_pr, raw_qt = plan[day_str]
 
-    print(f"🚀 {now.date()} 발송 시작...")
+    print(f"🚀 {kst_now.year}-{kst_now.month}-{day_str} (KST) 발송 프로세스 시작...")
 
     for lang_code, chat_id in RECIPIENTS.items():
         if not chat_id:
             continue
             
         try:
-            lang_pack = translations[lang_code]
+            lang_pack = translations.get(lang_code, translations['KO'])
             
-            # --- [수정됨] 언어에 맞게 성경 본문 번역 ---
-            nt = translate_citation(raw_nt, lang_code)
-            ps = translate_citation(raw_ps, lang_code) # 시편은 숫자만 있어서 사실상 그대로 나감
-            pr = translate_citation(raw_pr, lang_code) # 잠언도 동일
-            qt = translate_citation(raw_qt, lang_code)
-            # ----------------------------------------
+            # 1. 약어 번역 (예: 마 -> Matt)
+            nt_trans = translate_citation(raw_nt, lang_code)
+            ps_trans = translate_citation(raw_ps, lang_code) 
+            pr_trans = translate_citation(raw_pr, lang_code)
+            qt_trans = translate_citation(raw_qt, lang_code)
 
-            message = (
-                f"{lang_pack['title']} ({now.year}/{now.month}/{day_str})\n\n"
-                f"{lang_pack['qt']}\n👉 {qt}\n\n"
-                f"{lang_pack['reading']}\n"
-                f"▫️ {lang_pack['nt']}: {nt if nt else lang_pack['none']}\n"
-                f"▫️ {lang_pack['ps']}: {ps}{lang_pack['unit_ps']}\n"
-                f"▫️ {lang_pack['pr']}: {pr}{lang_pack['unit_pr']}\n\n"
+            # 2. 요약 메시지 전송
+            # 날짜 표시에 now 대신 kst_now 사용
+            summary_msg = (
+                f"{lang_pack['title']} ({kst_now.year}/{kst_now.month}/{day_str})\n\n"
+                f"{lang_pack['qt_label']}\n"
+                f"👉 {qt_trans}\n\n"
+                f"{lang_pack['rd_label']}\n"
+                f"▫️ {lang_pack['nt']}: {nt_trans if nt_trans else lang_pack['none']}\n"
+                f"▫️ {lang_pack['ps']}: {ps_trans}{lang_pack['unit_ps']}\n"
+                f"▫️ {lang_pack['pr']}: {pr_trans}{lang_pack['unit_pr']}\n\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"\"{lang_pack['slogan']}\""
             )
-            await bot.send_message(chat_id=chat_id, text=message)
-            print(f"✅ [{lang_code}] 전송 완료")
+            
+            await bot.send_message(chat_id=chat_id, text=summary_msg)
             await asyncio.sleep(0.5)
+
+            # 3. 본문 전송 (DB에서 조회)
+            # bible_common.py를 통해 해당 언어 DB에서 본문 가져오기
+            
+            # (A) 시편 본문
+            ps_text = get_chapter_text('시', raw_ps, lang_code)
+            if ps_text:
+                for part in split_text_for_telegram(ps_text):
+                    await bot.send_message(chat_id=chat_id, text=part)
+                    await asyncio.sleep(0.3)
+            
+            # (B) 잠언 본문
+            pr_text = get_chapter_text('잠', raw_pr, lang_code)
+            if pr_text:
+                for part in split_text_for_telegram(pr_text):
+                    await bot.send_message(chat_id=chat_id, text=part)
+                    await asyncio.sleep(0.3)
+
+            print(f"✅ [{lang_code}] 전송 완료")
+            
         except Exception as e:
             print(f"❌ [{lang_code}] 전송 실패: {e}")
 
