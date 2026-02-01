@@ -7,7 +7,11 @@ from bs4 import BeautifulSoup, NavigableString
 # ==========================================
 
 # 프로젝트 루트 경로 (결과 파일 저장 위치)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(current_dir) == 'tools':
+    BASE_DIR = os.path.dirname(current_dir)
+else:
+    BASE_DIR = current_dir
 OUTPUT_FILE = os.path.join(BASE_DIR, 'bible_mn_MUV.txt')
 
 # 몽골어 성경 원본 폴더 (build_bible_db.py와 동일)
