@@ -1,145 +1,21 @@
 import json
 import os
 import asyncio
-import re
-from datetime import datetime, timedelta  # [수정] timedelta 추가
+from datetime import datetime, timedelta
 from telegram import Bot
 from dotenv import load_dotenv
 
-# [필수] bible_common.py가 같은 폴더에 있어야 합니다.
-from bible_common import get_chapter_text, split_text_for_telegram
+# [수정] get_qt_text 함수 추가 임포트
+from bible_common import get_chapter_text, get_qt_text, split_text_for_telegram, translate_citation
 
 load_dotenv()
 
-# --- 설정 영역 ---
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-
 RECIPIENTS = {
     'KO': os.getenv('KO_CHAT_ID'),
     'EN': os.getenv('EN_CHAT_ID'),
     'MN': os.getenv('MN_CHAT_ID')
 }
-
-# --- 성경 약어 변환 사전 (Full List) ---
-BIBLE_MAP = {
-    # --- 구약 (Old Testament) ---
-    # 모세오경
-    '창': {'EN': 'Gen', 'MN': 'Эхл'},
-    '출': {'EN': 'Exod', 'MN': 'Гэт'},
-    '레': {'EN': 'Lev', 'MN': 'Лев'},
-    '민': {'EN': 'Num', 'MN': 'Тоо'},
-    '신': {'EN': 'Deut', 'MN': 'Дэд'},
-    
-    # 역사서
-    '수': {'EN': 'Josh', 'MN': 'Иош'},
-    '삿': {'EN': 'Judg', 'MN': 'Шүү'},
-    '룻': {'EN': 'Ruth', 'MN': 'Рут'},
-    '삼상': {'EN': '1Sam', 'MN': '1Сам'},
-    '삼하': {'EN': '2Sam', 'MN': '2Сам'},
-    '왕상': {'EN': '1Kgs', 'MN': '1Хаа'},
-    '왕하': {'EN': '2Kgs', 'MN': '2Хаа'},
-    '대상': {'EN': '1Chr', 'MN': '1Шас'},
-    '대하': {'EN': '2Chr', 'MN': '2Шас'},
-    '스': {'EN': 'Ezra', 'MN': 'Езр'},
-    '느': {'EN': 'Neh', 'MN': 'Нех'},
-    '에': {'EN': 'Esth', 'MN': 'Ест'},
-    
-    # 시가서
-    '욥': {'EN': 'Job', 'MN': 'Иов'},
-    '시': {'EN': 'Ps', 'MN': 'Дуу'},
-    '잠': {'EN': 'Prov', 'MN': 'Сур'},
-    '전': {'EN': 'Eccl', 'MN': 'Ном'},
-    '아': {'EN': 'Song', 'MN': 'Доо'},
-    
-    # 대선지서
-    '사': {'EN': 'Isa', 'MN': 'Иса'},
-    '렘': {'EN': 'Jer', 'MN': 'Иер'},
-    '애': {'EN': 'Lam', 'MN': 'Гаш'},
-    '겔': {'EN': 'Ezek', 'MN': 'Езе'},
-    '단': {'EN': 'Dan', 'MN': 'Дан'},
-    
-    # 소선지서
-    '호': {'EN': 'Hos', 'MN': 'Хос'},
-    '욜': {'EN': 'Joel', 'MN': 'Иое'},
-    '암': {'EN': 'Amos', 'MN': 'Амо'},
-    '옵': {'EN': 'Obad', 'MN': 'Оба'},
-    '욘': {'EN': 'Jonah', 'MN': 'Ион'},
-    '미': {'EN': 'Mic', 'MN': 'Мик'},
-    '나': {'EN': 'Nah', 'MN': 'Нах'},
-    '합': {'EN': 'Hab', 'MN': 'Хаб'},
-    '습': {'EN': 'Zeph', 'MN': 'Зеф'},
-    '학': {'EN': 'Hag', 'MN': 'Хаг'},
-    '슥': {'EN': 'Zech', 'MN': 'Зех'},
-    '말': {'EN': 'Mal', 'MN': 'Мал'},
-
-    # --- 신약 (New Testament) ---
-    # 복음서
-    '마': {'EN': 'Matt', 'MN': 'Мат'},
-    '막': {'EN': 'Mark', 'MN': 'Марк'},
-    '눅': {'EN': 'Luke', 'MN': 'Лук'},
-    '요': {'EN': 'John', 'MN': 'Иох'},
-    
-    # 역사서
-    '행': {'EN': 'Acts', 'MN': 'Үйл'},
-    
-    # 바울서신
-    '롬': {'EN': 'Rom', 'MN': 'Ром'},
-    '고전': {'EN': '1Cor', 'MN': '1Кор'},
-    '고후': {'EN': '2Cor', 'MN': '2Кор'},
-    '갈': {'EN': 'Gal', 'MN': 'Гал'},
-    '엡': {'EN': 'Eph', 'MN': 'Еф'},
-    '빌': {'EN': 'Phil', 'MN': 'Фил'},
-    '골': {'EN': 'Col', 'MN': 'Кол'},
-    '살전': {'EN': '1Thess', 'MN': '1Тес'},
-    '살후': {'EN': '2Thess', 'MN': '2Тес'},
-    '딤전': {'EN': '1Tim', 'MN': '1Тим'},
-    '딤후': {'EN': '2Tim', 'MN': '2Тим'},
-    '딛': {'EN': 'Titus', 'MN': 'Тит'},
-    '몬': {'EN': 'Phlm', 'MN': 'Филм'},
-    
-    # 일반서신
-    '히': {'EN': 'Heb', 'MN': 'Евр'},
-    '약': {'EN': 'Jas', 'MN': 'Иак'},
-    '벧전': {'EN': '1Pet', 'MN': '1Пет'},
-    '벧후': {'EN': '2Pet', 'MN': '2Пет'},
-    '요일': {'EN': '1John', 'MN': '1Иох'},
-    '요이': {'EN': '2John', 'MN': '2Иох'},
-    '요삼': {'EN': '3John', 'MN': '3Иох'},
-    '유': {'EN': 'Jude', 'MN': 'Иуд'},
-    
-    # 예언서
-    '계': {'EN': 'Rev', 'MN': 'Илч'}
-}
-
-# --- 데이터 로드 ---
-def load_plan():
-    file_path = os.path.join(os.path.dirname(__file__), 'bible_plan.json')
-    if os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
-
-# --- 성경 구절 번역 함수 ---
-def translate_citation(text, lang_code):
-    """
-    예: '마1-4' (KO) -> 'Matt 1-4' (EN) / 'Мат 1-4' (MN) 변환
-    """
-    if lang_code == 'KO' or not text:
-        return text
-
-    # 정규식으로 '한글성경명'과 '나머지(장절)' 분리
-    match = re.match(r"([가-힣]+)\s*(.*)", text)
-    
-    if match:
-        book_ko = match.group(1)
-        numbers = match.group(2)
-        
-        # 사전에 있는 책이면 번역
-        if book_ko in BIBLE_MAP:
-            book_trans = BIBLE_MAP[book_ko].get(lang_code, book_ko)
-            return f"{book_trans} {numbers}".strip()
-            
-    return text
 
 # --- 언어별 메시지 템플릿 ---
 translations = {
@@ -165,83 +41,87 @@ translations = {
         'rd_label': "📚 [Библи унших төлөвлөгөө]",
         'nt': "Шинэ Гэрээ", 'ps': "Дуулал", 'pr': "Сургаалт үгс",
         'unit_ps': "-р бүлэг", 'unit_pr': "-р бүлэг", 'none': "Ням гараг",
-        'slogan': "Христ шиг байж, Христ шиг болгоцгооё."
+        'slogan': "Христийн дүр төрхийг дуурайж, Түүний дүр төрхтэй адил болтугай"
     }
 }
 
+def load_monthly_plan(month):
+    filename = f"{month:02d}.json"
+    file_path = os.path.join(os.path.dirname(__file__), 'plans', filename)
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
 async def broadcast_messages():
     if not TELEGRAM_TOKEN:
-        print("❌ 설정 오류: TELEGRAM_TOKEN이 없습니다.")
+        print("❌ 설정 오류: TELEGRAM_TOKEN 없음")
         return
 
     bot = Bot(token=TELEGRAM_TOKEN)
     
-    # --- [수정된 부분] 날짜 계산 로직 ---
-    # GitHub 서버(UTC) 기준이 아닌 한국 시간(KST = UTC+9) 기준으로 오늘 날짜 계산
+    # KST 시간 기준
     kst_now = datetime.utcnow() + timedelta(hours=9)
+    current_month = kst_now.month
     day_str = str(kst_now.day)
-    # -----------------------------------
     
     # 테스트용 (필요시 주석 해제)
+    # current_month = 1
     # day_str = "15"
 
-    plan = load_plan()
-    
+    plan = load_monthly_plan(current_month)
     if day_str not in plan:
-        print(f"ℹ️ {day_str}일자 데이터가 없습니다.")
+        print(f"ℹ️ 데이터 없음: {current_month}월 {day_str}일")
         return
 
-    # JSON 원본 데이터 (한글 기준) 로드
+    # JSON 데이터: [신약, 시편, 잠언, QT]
     raw_nt, raw_ps, raw_pr, raw_qt = plan[day_str]
 
-    print(f"🚀 {kst_now.year}-{kst_now.month}-{day_str} (KST) 발송 프로세스 시작...")
+    print(f"🚀 {kst_now.strftime('%Y-%m-%d')} (KST) 발송 시작...")
 
     for lang_code, chat_id in RECIPIENTS.items():
-        if not chat_id:
-            continue
+        if not chat_id: continue
             
         try:
             lang_pack = translations.get(lang_code, translations['KO'])
             
-            # 1. 약어 번역 (예: 마 -> Matt)
-            nt_trans = translate_citation(raw_nt, lang_code)
-            ps_trans = translate_citation(raw_ps, lang_code) 
-            pr_trans = translate_citation(raw_pr, lang_code)
-            qt_trans = translate_citation(raw_qt, lang_code)
+            # 1. 표시용 텍스트 번역
+            qt_display = translate_citation(raw_qt, lang_code)
+            nt_display = translate_citation(raw_nt, lang_code)
+            ps_display = translate_citation(raw_ps, lang_code)
+            pr_display = translate_citation(raw_pr, lang_code)
 
             # 2. 요약 메시지 전송
-            # 날짜 표시에 now 대신 kst_now 사용
             summary_msg = (
-                f"{lang_pack['title']} ({kst_now.year}/{kst_now.month}/{day_str})\n\n"
-                f"{lang_pack['qt_label']}\n"
-                f"👉 {qt_trans}\n\n"
+                f"{lang_pack['title']} ({kst_now.strftime('%Y/%m/%d')})\n\n"
+                f"{lang_pack['qt_label']}\n👉 {qt_display}\n\n"
                 f"{lang_pack['rd_label']}\n"
-                f"▫️ {lang_pack['nt']}: {nt_trans if nt_trans else lang_pack['none']}\n"
-                f"▫️ {lang_pack['ps']}: {ps_trans}{lang_pack['unit_ps']}\n"
-                f"▫️ {lang_pack['pr']}: {pr_trans}{lang_pack['unit_pr']}\n\n"
+                f"▫️ {lang_pack['nt']}: {nt_display}\n"
+                f"▫️ {lang_pack['ps']}: {ps_display}{lang_pack['unit_ps']}\n"
+                f"▫️ {lang_pack['pr']}: {pr_display}{lang_pack['unit_pr']}\n\n"
                 f"━━━━━━━━━━━━━━━\n"
                 f"\"{lang_pack['slogan']}\""
             )
-            
             await bot.send_message(chat_id=chat_id, text=summary_msg)
             await asyncio.sleep(0.5)
 
-            # 3. 본문 전송 (DB에서 조회)
-            # bible_common.py를 통해 해당 언어 DB에서 본문 가져오기
-            
-            # (A) 시편 본문
-            ps_text = get_chapter_text('시', raw_ps, lang_code)
-            if ps_text:
-                for part in split_text_for_telegram(ps_text):
+            # 3. [신규] QT 본문 전송
+            qt_text = get_qt_text(raw_qt, lang_code)
+            if qt_text:
+                for part in split_text_for_telegram(qt_text):
                     await bot.send_message(chat_id=chat_id, text=part)
                     await asyncio.sleep(0.3)
             
-            # (B) 잠언 본문
-            pr_text = get_chapter_text('잠', raw_pr, lang_code)
-            if pr_text:
-                for part in split_text_for_telegram(pr_text):
-                    await bot.send_message(chat_id=chat_id, text=part)
-                    await asyncio.sleep(0.3)
+            # 4. 시편/잠언 본문 전송
+            for book_abbr, raw_chap in [('시', raw_ps), ('잠', raw_pr)]:
+                if not raw_chap: continue
+                
+                # 시편/잠언은 기존 방식대로 장 전체 가져오기
+                text = get_chapter_text(book_abbr, raw_chap, lang_code)
+                if text:
+                    for part in split_text_for_telegram(text):
+                        await bot.send_message(chat_id=chat_id, text=part)
+                        await asyncio.sleep(0.3)
 
             print(f"✅ [{lang_code}] 전송 완료")
             

@@ -1,0 +1,49 @@
+name: Monthly Plan Generator
+
+on:
+  schedule:
+    # 매월 28일 한국 시간 오전 10시 (UTC 01:00) 실행
+    # 28일에 미리 만들어두면 다음 달 1일부터 바로 사용 가능
+    - cron: '0 1 28 * *'
+  
+  # 수동 실행 버튼 (테스트용)
+  workflow_dispatch:
+
+permissions:
+  contents: write # 저장소에 파일(JSON)을 업로드할 권한 부여
+
+jobs:
+  generate-plan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Gemini Parser
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          # 인자 없이 실행하면 코드 내부에서 자동으로 '다음 달'을 계산함
+          python tools/gemini_parser.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "BibleBot Manager"
+          git config --global user.email "actions@github.com"
+          
+          # plans 폴더에 변경사항이 있는지 확인
+          git add plans/*.json
+          
+          # 변경사항이 없으면 에러 없이 종료, 있으면 커밋
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update monthly bible plan" && git push)

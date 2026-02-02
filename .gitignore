@@ -9,6 +9,7 @@ __pycache__/
 # OS 시스템 파일
 .DS_Store
 Thumbs.db
+*.ps1
 
 # (선택) 로그 파일이나 임시 파일이 있다면 추가
 *.log
