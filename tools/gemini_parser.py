@@ -3,6 +3,7 @@ import json
 import sys
 import PIL.Image
 from datetime import datetime, timedelta
+from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 
@@ -10,7 +11,20 @@ from google import genai
 # ⚙️ 경로 및 환경 설정
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+
+# [보안 패치] 중앙 .env 로드 로직
+def load_central_env():
+    current = Path(os.getcwd())
+    while current != current.parent:
+        target = current / '.secrets' / '.env'
+        if target.exists():
+            load_dotenv(target)
+            print(f"🔐 Loaded central .env from {target}")
+            return
+        current = current.parent
+    load_dotenv(os.path.join(BASE_DIR, '.env')) # Fallback
+
+load_central_env()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 def get_next_month():
