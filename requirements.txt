@@ -1,5 +1,0 @@
-google-genai
-python-telegram-bot
-python-dotenv
-Pillow
-protobuf<6.0.0dev
