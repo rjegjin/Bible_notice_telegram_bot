@@ -62,11 +62,17 @@ def translate_citation(text, lang_code):
     return text
 
 def get_chapter_text(book_abbrev, chapter_str, lang_code='KO'):
-    """(기존 기능) 시편/잠언처럼 '장' 전체를 가져올 때 사용"""
-    if not os.path.exists(DB_FILE): return None
+    """(기존 기능) 시편/잠언처럼 '장' 전체를 가져올 때 사용. '시 1-3' 같은 범위도 지원."""
+    if not os.path.exists(DB_FILE) or not chapter_str: return None
+    
+    # 숫자 범위 추출 ("시 1-3" -> start=1, end=3)
+    match = re.search(r"(\d+)(?:[-~](\d+))?", str(chapter_str))
+    if not match: return None
+    
+    start_c = int(match.group(1))
+    end_c = int(match.group(2)) if match.group(2) else start_c
     
     # DB 검색용 이름 변환 (시->Psalms 등)
-    # 몽골어/영어 DB에 저장된 실제 책 이름으로 매핑
     search_book = book_abbrev
     if lang_code != 'KO' and book_abbrev in BIBLE_MAP:
         search_book = BIBLE_MAP[book_abbrev].get(lang_code, book_abbrev)
@@ -76,18 +82,26 @@ def get_chapter_text(book_abbrev, chapter_str, lang_code='KO'):
     try:
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
-            sql = f"SELECT verse, content FROM {target_table} WHERE book=? AND chapter=? ORDER BY verse ASC"
-            cursor.execute(sql, (search_book, int(chapter_str)))
+            sql = f"SELECT chapter, verse, content FROM {target_table} WHERE book=? AND chapter BETWEEN ? AND ? ORDER BY chapter ASC, verse ASC"
+            cursor.execute(sql, (search_book, start_c, end_c))
             rows = cursor.fetchall()
             
             if not rows: return None
 
             ver_name = META_INFO[lang_code]['ver']
-            lines = [f"({search_book} {chapter_str} / {ver_name})"]
-            for v, c in rows:
-                lines.append(f"{v}. {c}")
+            range_str = f"{start_c}" if start_c == end_c else f"{start_c}-{end_c}"
+            lines = [f"({search_book} {range_str} / {ver_name})"]
+            
+            current_chap = -1
+            for c, v, content in rows:
+                # 여러 장일 경우 장 구분 표시
+                if start_c != end_c and current_chap != c:
+                    lines.append(f"\n[{c}장]")
+                    current_chap = c
+                lines.append(f"{v}. {content}")
             return "\n".join(lines)
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Chapter Error: {e}")
         return None
 
 def get_qt_text(citation_str, lang_code='KO'):
