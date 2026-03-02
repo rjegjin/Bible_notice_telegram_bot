@@ -122,24 +122,15 @@ async def broadcast_messages():
                 await bot.send_message(chat_id=chat_id, text=summary_msg)
                 await asyncio.sleep(0.5)
 
-                # 3. 본문 전송 (QT -> 구약 -> 신약 -> 시편/잠언 순)
+                # 3. 본문 전송 (QT -> 시편 -> 잠언 순)
                 # QT 본문
                 qt_text = get_qt_text(raw_qt, lang_code)
                 if qt_text:
                     for part in split_text_for_telegram(qt_text):
                         await bot.send_message(chat_id=chat_id, text=part)
                         await asyncio.sleep(0.3)
-                
-                # 성경 읽기 본문 (구약, 신약은 QT 방식과 동일하게 인용구 파싱)
-                for raw_cite in [raw_ot, raw_nt]:
-                    if not raw_cite: continue
-                    text = get_qt_text(raw_cite, lang_code) # QT용 파서가 인용구 파싱에 적합
-                    if text:
-                        for part in split_text_for_telegram(text):
-                            await bot.send_message(chat_id=chat_id, text=part)
-                            await asyncio.sleep(0.3)
 
-                # 시편/잠언 본문 (기존 방식)
+                # 시편/잠언 본문
                 for book_abbr, raw_chap in [('시', raw_ps), ('잠', raw_pr)]:
                     if not raw_chap: continue
                     text = get_chapter_text(book_abbr, raw_chap, lang_code)
