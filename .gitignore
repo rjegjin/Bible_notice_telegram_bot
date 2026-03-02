@@ -13,5 +13,9 @@ Thumbs.db
 
 # (선택) 로그 파일이나 임시 파일이 있다면 추가
 *.log
-*.png
-*.txt
+
+# assets 폴더 내 이미지는 추적 허용
+!assets/*.png
+!assets/*.jpg
+!assets/*.jpeg
+!assets/*.webp
