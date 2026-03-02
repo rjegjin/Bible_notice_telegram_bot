@@ -26,10 +26,15 @@
 *   **Telegram Bot Token**: [@BotFather](https://t.me/botfather)에게 메시지를 보내 생성하세요.
 *   **Google Gemini API Key**: [Google AI Studio](https://aistudio.google.com/)에서 무료로 발급받으세요.
 
-### 2. 지원되는 이미지 형식 (Supported Image Formats)
-Gemini AI가 분석 가능한 다음의 이미지 형식을 준비하세요.
-*   **형식**: `JPG`, `JPEG`, `PNG`, `WEBP`
-*   **권장 사항**: 텍스트가 선명하게 보이는 고해상도 이미지일수록 AI 분석 정확도가 높아집니다.
+### 2. 지원되는 이미지 형식 및 파일명 규칙 (CRITICAL)
+Gemini 파서가 이미지를 인식하려면 **반드시 정해진 규칙에 따라 파일 이름을 지정**해야 합니다.
+
+*   **저장 위치**: `assets/` 폴더 내부
+*   **지원 형식**: `JPG`, `JPEG`, `PNG` (고해상도 권장)
+*   **파일명 규칙**: `{연도}년_{월}월_{구분}_passage.{확장자}`
+    *   **성경 읽기표(BR)**: `2026년_03월_BR_passage.png`
+    *   **QT 본문표(QT)**: `2026년_03월_QT_passage.jpg`
+    *   *주의: 월(Month)은 반드시 2자리(01, 02... 12)로 입력해야 합니다.*
 
 ### 3. Telegram Chat ID 확인 방법
 메시지를 받을 대상에 따라 Chat ID 형식이 다릅니다.
@@ -85,7 +90,7 @@ MN_CHAT_ID=34567890
 ### Step 1: 성경 읽기표 이미지 변환 (AI 파싱)
 매달 한 번만 실행하면 됩니다.
 
-1.  월간 읽기표 이미지를 `assets/` 폴더에 넣습니다. (파일 확장자: .jpg, .png 등)
+1.  월간 읽기표 이미지를 규칙에 맞게 `assets/` 폴더에 넣습니다.
 2.  아래 명령어를 실행합니다 (예: 2026년 3월 데이터 생성 시).
     ```bash
     python tools/gemini_parser.py 2026 3
@@ -106,7 +111,7 @@ python send_bible_passage_all.py
 
 ```text
 .
-├── assets/                 # 성경 읽기표/QT 이미지 보관 (.jpg, .png, .webp)
+├── assets/                 # [필수] 규칙에 맞는 이미지 보관 폴더
 ├── plans/                  # Gemini가 생성한 월별 읽기 데이터 (JSON)
 ├── tools/                  # 관리자용 도구 모음
 │   ├── gemini_parser.py    # 이미지 -> JSON 변환 AI 도구
@@ -132,8 +137,8 @@ python send_bible_passage_all.py
 **Q: 특정 날짜의 본문이 틀리게 분석되었어요.**
 A: `plans/*.json` 파일을 열어 해당 날짜의 텍스트를 수동으로 수정한 뒤 저장하면 됩니다.
 
-**Q: 단체방에 메시지가 안 가요.**
-A: Chat ID에 마이너스(`-`) 기호가 포함되어 있는지 확인하고, 봇이 해당 방에 '관리자' 혹은 '메시지 전송 권한'이 있는 멤버로 초대되어 있는지 확인하세요.
+**Q: "이미지 파일이 없습니다"라는 오류가 뜹니다.**
+A: `assets/` 폴더 안에 파일명이 `{연도}년_{월}월_{구분}_passage` 형식과 일치하는지 다시 확인하세요. (예: `2026년_03월_BR_passage.png`)
 
 ---
 
