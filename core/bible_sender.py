@@ -1,19 +1,16 @@
 import json
 import os
 import asyncio
+import re
 from datetime import datetime, timedelta
 from telegram import Bot
-# load_dotenv 삭제 (main.py 또는 상위에서 처리 권장)
 
 # [필수] bible_scripture_resolver.py가 같은 폴더에 있어야 합니다.
 from core.bible_scripture_resolver import get_chapter_text, get_qt_text, split_text_for_telegram, translate_citation
 
-# load_dotenv() 삭제
-
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
-# --- [핵심 수정 1] 수신처 설정 (Key: 방ID, Value: 언어 리스트/문자열) ---
-# .env에서 ID를 못 읽어오면 Key가 None이 될 수 있으므로, 아래 루프에서 예외 처리함
+# --- 수신처 설정 ---
 RECIPIENTS = {
     os.getenv('KO_CHAT_ID'): 'KO',
     os.getenv('EN_CHAT_ID'): 'EN',
@@ -49,7 +46,6 @@ translations = {
 }
 
 def load_monthly_plan(month):
-    # data/plans 폴더 내의 "01.json", "02.json" 형식 파일을 읽음
     filename = f"{month:02d}.json"
     file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'plans', filename)
     if os.path.exists(file_path):
@@ -57,15 +53,55 @@ def load_monthly_plan(month):
             return json.load(f)
     return {}
 
+def format_summary(row, lang_code, date_str):
+    """요약 메시지를 깔끔한 문자열로 포맷팅 (줄바꿈 버그 수정 버전)"""
+    lang_pack = translations.get(lang_code, translations['KO'])
+    raw_nt, raw_ot, raw_ps, raw_pr, raw_qt = (row + [""] * 5)[:5]
+    
+    qt_display = translate_citation(raw_qt, lang_code)
+    ot_display = translate_citation(raw_ot, lang_code)
+    nt_display = translate_citation(raw_nt, lang_code)
+    ps_display = translate_citation(raw_ps, lang_code)
+    pr_display = translate_citation(raw_pr, lang_code)
+
+    summary_lines = [
+        f"{lang_pack['title']} ({date_str})\n",
+        f"{lang_pack['qt_label']}\n👉 {qt_display}\n",
+        f"{lang_pack['rd_label']}"
+    ]
+    summary_lines.append(f"▫️ {lang_pack['nt']}: {nt_display}")
+    if raw_ot:
+        summary_lines.append(f"▫️ {lang_pack['ot']}: {ot_display}")
+    summary_lines.append(f"▫️ {lang_pack['ps']}: {ps_display}{lang_pack['unit_ps']}")
+    summary_lines.append(f"▫️ {lang_pack['pr']}: {pr_display}{lang_pack['unit_pr']}\n")
+    summary_lines.append(f"━━━━━━━━━━━━━━━\n\"{lang_pack['slogan']}\"")
+    
+    return "\n".join(summary_lines)
+
+async def send_only_summaries(chat_id):
+    """사용자가 요청한 ID로 3개 국어 요약본만 발송"""
+    if not TELEGRAM_TOKEN: return
+    bot = Bot(token=TELEGRAM_TOKEN)
+    kst_now = datetime.utcnow() + timedelta(hours=9)
+    day_str = str(kst_now.day)
+    plan = load_monthly_plan(kst_now.month)
+    
+    if day_str not in plan: return
+    row = plan[day_str]
+    date_display = kst_now.strftime('%Y/%m/%d')
+
+    for lang in ['KO', 'EN', 'MN']:
+        msg = format_summary(row, lang, date_display)
+        await bot.send_message(chat_id=chat_id, text=msg)
+        await asyncio.sleep(0.5)
+    print(f"✅ 개인 대화방({chat_id}) 요약본 발송 완료")
+
 async def broadcast_messages():
     if not TELEGRAM_TOKEN:
         print("❌ 설정 오류: TELEGRAM_TOKEN 없음")
         return
 
     bot = Bot(token=TELEGRAM_TOKEN)
-    
-    # --- [핵심 수정 2] KST 시간 계산 ---
-    # GitHub Actions 서버(UTC)에서도 한국 시간으로 정확히 계산
     kst_now = datetime.utcnow() + timedelta(hours=9)
     current_month = kst_now.month
     day_str = str(kst_now.day)
@@ -75,63 +111,33 @@ async def broadcast_messages():
         print(f"ℹ️ 데이터 없음: {current_month}월 {day_str}일")
         return
 
-    # JSON 데이터 구조: [NT, OT, Psalms, Proverbs, QT] (5개 요소)
-    # 구형 4개 요소 데이터와의 호환성을 위한 처리
     row = plan[day_str]
-    if len(row) == 5:
-        raw_nt, raw_ot, raw_ps, raw_pr, raw_qt = row
-    else: # 구형 4개 요소 대응
-        raw_ot = ""
-        raw_nt, raw_ps, raw_pr, raw_qt = row
+    raw_nt, raw_ot, raw_ps, raw_pr, raw_qt = (row + [""] * 5)[:5]
 
     print(f"🚀 {kst_now.strftime('%Y-%m-%d')} (KST) 발송 시작...")
 
     for chat_id, lang_info in RECIPIENTS.items():
         if not chat_id: continue 
-
         target_langs = lang_info if isinstance(lang_info, list) else [lang_info]
 
         for lang_code in target_langs:
             try:
-                lang_pack = translations.get(lang_code, translations['KO'])
-                
-                # 1. 텍스트 번역 (표시용)
-                qt_display = translate_citation(raw_qt, lang_code)
-                ot_display = translate_citation(raw_ot, lang_code)
-                nt_display = translate_citation(raw_nt, lang_code)
-                ps_display = translate_citation(raw_ps, lang_code)
-                pr_display = translate_citation(raw_pr, lang_code)
-
-                # 2. 요약 메시지 구성
-                summary_lines = [
-                    f"{lang_pack['title']} ({kst_now.strftime('%Y/%m/%d')})\n",
-                    f"{lang_pack['qt_label']}\n👉 {qt_display}\n",
-                    f"{lang_pack['rd_label']}"
-                ]
-                
-                summary_lines.append(f"▫️ {lang_pack['nt']}: {nt_display}")
-                
-                # 구약이 있을 때만 추가
-                if raw_ot:
-                    summary_lines.append(f"▫️ {lang_pack['ot']}: {ot_display}")
-                
-                summary_lines.append(f"▫️ {lang_pack['ps']}: {ps_display}{lang_pack['unit_ps']}")
-                summary_lines.append(f"▫️ {lang_pack['pr']}: {pr_display}{lang_pack['unit_pr']}\n")
-                summary_lines.append(f"━━━━━━━━━━━━━━━\n\"{lang_pack['slogan']}\"")
-                
-                summary_msg = "\n".join(summary_lines)
+                # 1. 요약 메시지 전송
+                summary_msg = format_summary(row, lang_code, kst_now.strftime('%Y/%m/%d'))
                 await bot.send_message(chat_id=chat_id, text=summary_msg)
                 await asyncio.sleep(0.5)
 
-                # 3. 본문 전송 (QT -> 시편 -> 잠언 순)
-                # QT 본문
-                qt_text = get_qt_text(raw_qt, lang_code)
+                # 2. 본문 전송 (QT -> 시편 -> 잠언 순)
+                qt_cite = raw_qt
+                if qt_cite and re.match(r"^\d", qt_cite):
+                    qt_cite = f"마 {qt_cite}"
+                
+                qt_text = get_qt_text(qt_cite, lang_code)
                 if qt_text:
                     for part in split_text_for_telegram(qt_text):
                         await bot.send_message(chat_id=chat_id, text=part)
                         await asyncio.sleep(0.3)
 
-                # 시편/잠언 본문
                 for book_abbr, raw_chap in [('시', raw_ps), ('잠', raw_pr)]:
                     if not raw_chap: continue
                     text = get_chapter_text(book_abbr, raw_chap, lang_code)
@@ -141,7 +147,6 @@ async def broadcast_messages():
                             await asyncio.sleep(0.3)
 
                 print(f"   ✅ [{lang_code}] 전송 성공 (Chat: {chat_id})")
-
             except Exception as e:
                 print(f"   ❌ [{lang_code}] 전송 실패: {e}")
 

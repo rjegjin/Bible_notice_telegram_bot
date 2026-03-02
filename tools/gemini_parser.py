@@ -82,21 +82,25 @@ def generate_monthly_plan(year, month):
         valid_abbrs = ", ".join(list(BIBLE_MAP.keys()))
 
         prompt = f"""
-        You are a data assistant. Parse the provided image(s) for {year_str}-{month_str}.
+        You are a high-precision data assistant. Parse the provided Bible reading plan image(s) for {year_str}-{month_str}.
         Images provided: {', '.join(image_info)}
         
         Rules:
-        1. Key: Day string (e.g., "1", "2").
-        2. Value: A list ["NT", "OT", "Psalms", "Proverbs", "QT"].
-           - "NT", "OT", "Psalms", "Proverbs" are from the BR image. (Read left to right: NT first, then OT, then Psalms, then Proverbs).
-           - "QT" is from the QT image.
+        1. Key: Day string (e.g., "1", "2", ..., "31").
+        2. Value: A list of exactly 5 strings: ["NT", "OT", "Psalms", "Proverbs", "QT"].
+           - Column 1: NT (New Testament) - Read left to right.
+           - Column 2: OT (Old Testament)
+           - Column 3: Psalms (시편/시)
+           - Column 4: Proverbs (잠언/잠)
+           - "QT" is from the second image (if provided).
         3. Valid Bible abbreviations for NT/OT: {valid_abbrs}
-        4. If a category (like OT) is missing for a day, leave it as an empty string ("").
-        5. IMPORTANT: If a book name is omitted in the image but chapter numbers are present (e.g., just "2-3"), DO NOT leave it empty. Extract exactly the numbers (e.g., "2-3").
-        6. For QT, use ONLY the short abbreviation (e.g., "사 53:1-12" instead of "이사야 53:1-12").
-        7. Output Example: {{"1": ["마1", "창1-2", "시1", "잠1", "사53:1-12"]}}
+        4. OMITTED BOOK NAMES: If a column contains only numbers (e.g., "1-3", "4-6") because the book name was mentioned on a previous day, DO NOT leave it empty. Extract exactly those numbers.
+        5. MON-SAT COMPLETENESS: Every row from Monday to Saturday MUST have values for all 5 columns. Do not skip the OT column if it's a reading day.
+        6. RANGES: Pay close attention to ranges like "1-3", "4-6". Do not confuse "1-3" with "3-4".
+        7. QT FORMAT: Use short abbreviations (e.g., "마 1:1-17" instead of "마태복음 1:1-17"). If QT has only chapter:verse (e.g., "1:1-17"), assume it is "마" (Matthew) unless otherwise specified.
+        8. Return ONLY raw JSON. No code blocks.
         
-        Return ONLY raw JSON. No code blocks.
+        Output Example: {{"1": ["마 1-2", "창 1-3", "시 1", "잠 1", "마 1:1-17"]}}
         """
         contents.insert(0, prompt)
 

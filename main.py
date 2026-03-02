@@ -12,20 +12,14 @@ sys.path.append(BASE_DIR)
 
 # [보안 & 편의] 중앙 .env 로드 로직 (root/.secrets/.env 우선)
 def load_env_centralized():
-    # 1. 최상위 .secrets/.env 확인
     central_secrets = Path("/home/rjegj/projects/.secrets/.env")
     if central_secrets.exists():
         load_dotenv(central_secrets)
-        # print(f"🔐 Loaded central secrets from {central_secrets}")
         return True
-    
-    # 2. 프로젝트 로컬 .env 확인 (Fallback)
     local_env = os.path.join(BASE_DIR, '.env')
     if os.path.exists(local_env):
         load_dotenv(local_env)
-        # print(f"📝 Loaded local .env from {local_env}")
         return True
-    
     return False
 
 # 실행 전 환경 변수 로드
@@ -34,13 +28,12 @@ load_env_centralized()
 # 신규 구조에 맞춘 임포트
 try:
     from tools.gemini_parser import generate_monthly_plan
-    from core.bible_sender import broadcast_messages
+    from core.bible_sender import broadcast_messages, send_only_summaries
 except ImportError as e:
     print(f"❌ 모듈 임포트 실패: {e}")
     sys.exit(1)
 
 def check_plan_exists(year, month):
-    # data/plans 폴더 내 데이터 확인
     plan_path = os.path.join(BASE_DIR, 'data', 'plans', f"{str(month).zfill(2)}.json")
     return os.path.exists(plan_path)
 
@@ -72,11 +65,13 @@ async def start():
     
     # send: 발송만
     send_p = subparsers.add_parser("send", help="메시지만 발송")
+
+    # summary: 개인톡 요약본 발송
+    summary_p = subparsers.add_parser("summary", help="개인 대화방으로 3개 국어 요약본만 발송")
     
-    # check: 채팅방 ID 확인 (추가)
+    # check: 채팅방 ID 확인
     check_p = subparsers.add_parser("check", help="최근 도착한 메시지의 채팅방 ID 확인")
     
-    # 인자 없이 실행할 경우를 대비해 기본값 처리
     if len(sys.argv) == 1:
         args = parser.parse_args(["run"])
     else:
@@ -88,13 +83,15 @@ async def start():
         if args.year and args.month:
             generate_monthly_plan(args.year, args.month)
         else:
-            # 다음 달 자동 계산 (기존 gemini_parser 로직 활용)
             from tools.gemini_parser import get_next_month
             nxt_y, nxt_m = get_next_month()
             print(f"📅 연/월 생략됨. 자동으로 다음 달({nxt_y}년 {nxt_m}월) 데이터를 생성합니다.")
             generate_monthly_plan(nxt_y, nxt_m)
     elif args.command == "send":
         await broadcast_messages()
+    elif args.command == "summary":
+        # 사용자 개인 ID (5929322817)로 발송
+        await send_only_summaries("5929322817")
     elif args.command == "check":
         from tools.check_chat_ids import check_telegram_ids
         check_telegram_ids()
