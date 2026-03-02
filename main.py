@@ -73,6 +73,9 @@ async def start():
     # send: 발송만
     send_p = subparsers.add_parser("send", help="메시지만 발송")
     
+    # check: 채팅방 ID 확인 (추가)
+    check_p = subparsers.add_parser("check", help="최근 도착한 메시지의 채팅방 ID 확인")
+    
     # 인자 없이 실행할 경우를 대비해 기본값 처리
     if len(sys.argv) == 1:
         args = parser.parse_args(["run"])
@@ -92,6 +95,9 @@ async def start():
             generate_monthly_plan(nxt_y, nxt_m)
     elif args.command == "send":
         await broadcast_messages()
+    elif args.command == "check":
+        from tools.check_chat_ids import check_telegram_ids
+        check_telegram_ids()
     elif args.command == "run":
         year = args.year if args.year else now.year
         month = args.month if args.month else now.month
