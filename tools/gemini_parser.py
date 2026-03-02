@@ -92,7 +92,9 @@ def generate_monthly_plan(year, month):
            - "QT" is from the QT image.
         3. Valid Bible abbreviations for NT/OT: {valid_abbrs}
         4. If a category (like OT) is missing for a day, leave it as an empty string ("").
-        5. Output Example: {{"1": ["마1", "창1", "시1", "잠1", "삼상1"]}}
+        5. IMPORTANT: If a book name is omitted in the image but chapter numbers are present (e.g., just "2-3"), DO NOT leave it empty. Extract exactly the numbers (e.g., "2-3").
+        6. For QT, use ONLY the short abbreviation (e.g., "사 53:1-12" instead of "이사야 53:1-12").
+        7. Output Example: {{"1": ["마1", "창1-2", "시1", "잠1", "사53:1-12"]}}
         
         Return ONLY raw JSON. No code blocks.
         """
@@ -108,6 +110,51 @@ def generate_monthly_plan(year, month):
         
         # 날짜순 정렬
         sorted_data = dict(sorted(bible_data.items(), key=lambda item: int(item[0])))
+
+        # 후처리: 권수가 생략되고 장수만 있는 경우 이전 날짜의 권수를 상속 (NT, OT, Psalms, Proverbs)
+        import re
+        last_books = ["", "", "", "", ""]
+        
+        # 풀네임 -> 약어 변환 매핑 (예외 처리용)
+        full_to_abbr = {
+            "마태복음": "마", "마가복음": "막", "누가복음": "눅", "요한복음": "요", "사도행전": "행",
+            "로마서": "롬", "고린도전서": "고전", "고린도후서": "고후", "갈라디아서": "갈", "에베소서": "엡",
+            "빌립보서": "빌", "골로새서": "골", "데살로니가전서": "살전", "데살로니가후서": "살후",
+            "디모데전서": "딤전", "디모데후서": "딤후", "디도서": "딛", "빌레몬서": "몬", "히브리서": "히",
+            "야고보서": "약", "베드로전서": "벧전", "베드로후서": "벧후", "요한일서": "요일",
+            "요한이서": "요이", "요한삼서": "요삼", "유다서": "유", "요한계시록": "계",
+            "창세기": "창", "출애굽기": "출", "레위기": "레", "민수기": "민", "신명기": "신",
+            "여호수아": "수", "사사기": "삿", "룻기": "룻", "사무엘상": "삼상", "사무엘하": "삼하",
+            "열왕기상": "왕상", "열왕기하": "왕하", "역대상": "대상", "역대하": "대하", "에스라": "스",
+            "느헤미야": "느", "에스더": "에", "욥기": "욥", "시편": "시", "잠언": "잠", "전도서": "전",
+            "아가": "아", "이사야": "사", "예레미야": "렘", "애가": "애", "예레미야애가": "애",
+            "에스겔": "겔", "다니엘": "단", "호세아": "호", "요엘": "욜", "아모스": "암",
+            "오바댜": "옵", "요나": "욘", "미가": "미", "나훔": "나", "하박국": "합",
+            "스바냐": "습", "학개": "학", "스가랴": "슥", "말라기": "말"
+        }
+
+        for day, row in sorted_data.items():
+            for i in range(len(row)):
+                cell = row[i].strip()
+                if not cell: continue
+                
+                # 1. 풀네임 약어로 치환 (특히 QT에서 유용)
+                for full, abbr in full_to_abbr.items():
+                    if cell.startswith(full):
+                        cell = cell.replace(full, abbr, 1)
+                        row[i] = cell
+                        break
+                
+                # 2. 권수 상속 로직 (QT 제외, 0~3번 인덱스만)
+                if i < 4:
+                    match = re.match(r"^([가-힣]+)", cell)
+                    if match:
+                        last_books[i] = match.group(1)
+                    elif last_books[i] and re.match(r"^\d", cell):
+                        # 문자로 시작하지 않고 숫자(장)로만 시작하면 이전 권수 붙이기
+                        row[i] = f"{last_books[i]} {cell}"
+            
+            sorted_data[day] = row
 
         plans_dir = os.path.join(BASE_DIR, 'data', 'plans')
         if not os.path.exists(plans_dir): os.makedirs(plans_dir)
