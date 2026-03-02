@@ -82,24 +82,24 @@ def generate_monthly_plan(year, month):
         valid_abbrs = ", ".join(list(BIBLE_MAP.keys()))
 
         prompt = f"""
-        You are a high-precision data assistant. Parse the provided Bible reading plan image(s) for {year_str}-{month_str}.
-        Images provided: {', '.join(image_info)}
+        You are a Bible data extraction expert. I am providing TWO images for the {year_str}-{month_str} plan.
+        1. IMAGE 1 (Bible Reading Plan): Contains columns for NT, OT, Psalms, and Proverbs.
+        2. IMAGE 2 (QT Passage List): Contains the "QT" passage for each day.
         
         Rules:
-        1. Key: Day string (e.g., "1", "2", ..., "31").
-        2. Value: A list of exactly 5 strings: ["NT", "OT", "Psalms", "Proverbs", "QT"].
-           - Column 1: NT (New Testament) - Read left to right.
-           - Column 2: OT (Old Testament)
-           - Column 3: Psalms (시편/시)
-           - Column 4: Proverbs (잠언/잠)
-           - "QT" is from the second image (if provided).
-        3. Valid Bible abbreviations for NT/OT: {valid_abbrs}
-        4. OMITTED BOOK NAMES: If a column contains only numbers (e.g., "1-3", "4-6") because the book name was mentioned on a previous day, DO NOT leave it empty. Extract exactly those numbers.
-        5. MON-SAT COMPLETENESS: Every row from Monday to Saturday MUST have values for all 5 columns. Do not skip the OT column if it's a reading day.
-        6. RANGES: Pay close attention to ranges like "1-3", "4-6". Do not confuse "1-3" with "3-4".
-        7. QT FORMAT: Use short abbreviations (e.g., "마 1:1-17" instead of "마태복음 1:1-17"). If QT has only chapter:verse (e.g., "1:1-17"), assume it is "마" (Matthew) unless otherwise specified.
-        8. Return ONLY raw JSON. No code blocks.
+        1. Output format: Exactly 5 strings per day: ["NT", "OT", "Psalms", "Proverbs", "QT"].
+        2. FROM IMAGE 1 (Columns left to right):
+           - NT: New Testament
+           - OT: Old Testament
+           - Psalms: 시편/시
+           - Proverbs: 잠언/잠
+        3. FROM IMAGE 2 (CRITICAL):
+           - Extract the "QT" passage for each day. DO NOT leave this empty if it's visible in the second image.
+        4. OMITTED BOOK NAMES: If NT/OT/Psalms/Proverbs columns only have numbers (e.g., "1-3"), extract exactly those numbers.
+        5. QT FORMAT: Use short abbreviations (e.g., "마 1:1-17"). If only "1:1-17" is shown, assume "마" (Matthew).
+        6. MON-SAT: Every day must have all 5 values.
         
+        Return ONLY raw JSON. No markdown code blocks.
         Output Example: {{"1": ["마 1-2", "창 1-3", "시 1", "잠 1", "마 1:1-17"]}}
         """
         contents.insert(0, prompt)
