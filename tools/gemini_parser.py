@@ -153,6 +153,11 @@ def generate_monthly_plan(year, month):
                     elif last_books[i] and re.match(r"^\d", cell):
                         # 문자로 시작하지 않고 숫자(장)로만 시작하면 이전 권수 붙이기
                         row[i] = f"{last_books[i]} {cell}"
+                
+                # 3. QT(인덱스 4)에 장절만 있는 경우 기본값(마태복음) 추가
+                if i == 4:
+                    if re.match(r"^\d", cell):
+                        row[i] = f"마{cell}"
             
             sorted_data[day] = row
 
