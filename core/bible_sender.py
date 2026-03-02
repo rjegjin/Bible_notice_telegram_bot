@@ -42,9 +42,9 @@ translations = {
         'title': "🌟 Өдрийн бясалгал",
         'qt_label': "📖 [Өнөөдрийн QT]",
         'rd_label': "📚 [Библи унших төлөвлөгөө]",
-        'ot': "Huuchin Gere", 'nt': "Shine Gere", 'ps': "Duulal", 'pr': "Surgaalt ug",
-        'unit_ps': "-r buleg", 'unit_pr': "-r buleg", 'none': "Nyam garaig",
-        'slogan': "Christ shig baij, Christ shig bolgotsgooe." 
+        'ot': "Хуучин Гэрээ", 'nt': "Шинэ Гэрээ", 'ps': "Дуулал", 'pr': "Сургаалт үгс",
+        'unit_ps': "-р бүлэг", 'unit_pr': "-р бүлэг", 'none': "Ням гараг (Хувийн уншлага)",
+        'slogan': "Христ шиг байж, Христ шиг болгоцгооё." 
     }
 }
 
@@ -75,11 +75,11 @@ async def broadcast_messages():
         print(f"ℹ️ 데이터 없음: {current_month}월 {day_str}일")
         return
 
-    # JSON 데이터 구조: [OT, NT, Psalms, Proverbs, QT] (5개 요소)
+    # JSON 데이터 구조: [NT, OT, Psalms, Proverbs, QT] (5개 요소)
     # 구형 4개 요소 데이터와의 호환성을 위한 처리
     row = plan[day_str]
     if len(row) == 5:
-        raw_ot, raw_nt, raw_ps, raw_pr, raw_qt = row
+        raw_nt, raw_ot, raw_ps, raw_pr, raw_qt = row
     else: # 구형 4개 요소 대응
         raw_ot = ""
         raw_nt, raw_ps, raw_pr, raw_qt = row
@@ -109,11 +109,12 @@ async def broadcast_messages():
                     f"{lang_pack['rd_label']}"
                 ]
                 
+                summary_lines.append(f"▫️ {lang_pack['nt']}: {nt_display}")
+                
                 # 구약이 있을 때만 추가
                 if raw_ot:
                     summary_lines.append(f"▫️ {lang_pack['ot']}: {ot_display}")
                 
-                summary_lines.append(f"▫️ {lang_pack['nt']}: {nt_display}")
                 summary_lines.append(f"▫️ {lang_pack['ps']}: {ps_display}{lang_pack['unit_ps']}")
                 summary_lines.append(f"▫️ {lang_pack['pr']}: {pr_display}{lang_pack['unit_pr']}\n")
                 summary_lines.append(f"━━━━━━━━━━━━━━━\n\"{lang_pack['slogan']}\"")
