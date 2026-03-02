@@ -8,26 +8,18 @@ from pathlib import Path
 # 프로젝트 루트 경로 설정
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
-sys.path.append(os.path.join(BASE_DIR, 'tools'))
 
-# 기존 모듈 임포트 (경로 문제 해결)
+# 신규 구조에 맞춘 임포트
 try:
     from tools.gemini_parser import generate_monthly_plan
-except ImportError:
-    try:
-        from gemini_parser import generate_monthly_plan
-    except ImportError:
-        print("❌ gemini_parser 모듈을 찾을 수 없습니다.")
-        sys.exit(1)
-
-try:
-    from send_bible_passage_all import broadcast_messages
-except ImportError:
-    print("❌ send_bible_passage_all 모듈을 찾을 수 없습니다.")
+    from core.bible_sender import broadcast_messages
+except ImportError as e:
+    print(f"❌ 모듈 임포트 실패: {e}")
     sys.exit(1)
 
 def check_plan_exists(year, month):
-    plan_path = os.path.join(BASE_DIR, 'plans', f"{str(month).zfill(2)}.json")
+    # data/plans 폴더 내 데이터 확인
+    plan_path = os.path.join(BASE_DIR, 'data', 'plans', f"{str(month).zfill(2)}.json")
     return os.path.exists(plan_path)
 
 async def run_smart_mode(year, month):
@@ -80,5 +72,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(start())
     except KeyboardInterrupt:
-        print("
-👋 프로그램을 종료합니다.")
+        print("\n👋 프로그램을 종료합니다.")
