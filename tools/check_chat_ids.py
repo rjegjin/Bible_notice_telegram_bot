@@ -36,19 +36,19 @@ def check_telegram_ids():
 
         results = data.get('result', [])
         if not results:
-            print("
-ℹ️ 최근 메시지 기록이 없습니다.")
+            print("\nℹ️ 최근 메시지 기록이 없습니다.")
             print("👉 봇(@Daily_bible_reading_2026bot)에게 메시지를 보내거나,")
             print("👉 봇이 있는 단체방에서 아무 메시지나 보낸 후 다시 실행해주세요.")
             return
 
-        print("
-🔍 최근 발견된 채팅방 정보:")
+        print("\n🔍 최근 발견된 채팅방 정보:")
         print("-" * 50)
         seen = set()
         for update in results:
-            # 다양한 메시지 타입 대응 (일반 메시지, 편집된 메시지, 채널 게시물 등)
-            msg = update.get('message') or update.get('my_chat_member') or update.get('channel_post') or update.get('edited_message')
+            # 메시지 타입 추출
+            msg = update.get('message') or update.get('my_chat_member') or \
+                  update.get('channel_post') or update.get('edited_message')
+            
             if not msg: continue
             
             chat = msg.get('chat')
