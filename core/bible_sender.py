@@ -3,12 +3,12 @@ import os
 import asyncio
 from datetime import datetime, timedelta
 from telegram import Bot
-from dotenv import load_dotenv
+# load_dotenv 삭제 (main.py 또는 상위에서 처리 권장)
 
 # [필수] bible_scripture_resolver.py가 같은 폴더에 있어야 합니다.
 from core.bible_scripture_resolver import get_chapter_text, get_qt_text, split_text_for_telegram, translate_citation
 
-load_dotenv()
+# load_dotenv() 삭제
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 

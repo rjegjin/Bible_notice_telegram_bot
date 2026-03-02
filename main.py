@@ -4,10 +4,32 @@ import argparse
 import asyncio
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
 
 # 프로젝트 루트 경로 설정
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
+
+# [보안 & 편의] 중앙 .env 로드 로직 (root/.secrets/.env 우선)
+def load_env_centralized():
+    # 1. 최상위 .secrets/.env 확인
+    central_secrets = Path("/home/rjegj/projects/.secrets/.env")
+    if central_secrets.exists():
+        load_dotenv(central_secrets)
+        # print(f"🔐 Loaded central secrets from {central_secrets}")
+        return True
+    
+    # 2. 프로젝트 로컬 .env 확인 (Fallback)
+    local_env = os.path.join(BASE_DIR, '.env')
+    if os.path.exists(local_env):
+        load_dotenv(local_env)
+        # print(f"📝 Loaded local .env from {local_env}")
+        return True
+    
+    return False
+
+# 실행 전 환경 변수 로드
+load_env_centralized()
 
 # 신규 구조에 맞춘 임포트
 try:

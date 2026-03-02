@@ -17,19 +17,19 @@ from core.bible_scripture_resolver import BIBLE_MAP
 # ⚙️ 경로 및 환경 설정
 # ==========================================
 
-# [보안 패치] 중앙 .env 로드 로직
-def load_central_env():
-    current = Path(os.getcwd())
-    while current != current.parent:
-        target = current / '.secrets' / '.env'
-        if target.exists():
-            load_dotenv(target)
-            print(f"🔐 Loaded central .env from {target}")
-            return
-        current = current.parent
-    load_dotenv(os.path.join(BASE_DIR, '.env')) # Fallback
+# [보안 & 편의] 중앙 .env 로드 로직 (root/.secrets/.env 우선)
+def load_env_centralized():
+    central_secrets = Path("/home/rjegj/projects/.secrets/.env")
+    if central_secrets.exists():
+        load_dotenv(central_secrets)
+        return True
+    local_env = os.path.join(BASE_DIR, '.env')
+    if os.path.exists(local_env):
+        load_dotenv(local_env)
+        return True
+    return False
 
-load_central_env()
+load_env_centralized()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 def get_next_month():
