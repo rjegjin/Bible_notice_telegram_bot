@@ -67,8 +67,8 @@ async def start():
     
     # parse: 데이터 생성만
     parse_p = subparsers.add_parser("parse", help="데이터(JSON)만 생성")
-    parse_p.add_argument("year", type=int, help="연도")
-    parse_p.add_argument("month", type=int, help="월")
+    parse_p.add_argument("year", type=int, nargs='?', help="연도 (생략 시 다음 달)")
+    parse_p.add_argument("month", type=int, nargs='?', help="월 (생략 시 다음 달)")
     
     # send: 발송만
     send_p = subparsers.add_parser("send", help="메시지만 발송")
@@ -80,14 +80,21 @@ async def start():
         args = parser.parse_args()
     
     now = datetime.now()
-    year = args.year if hasattr(args, 'year') and args.year else now.year
-    month = args.month if hasattr(args, 'month') and args.month else now.month
     
     if args.command == "parse":
-        generate_monthly_plan(args.year, args.month)
+        if args.year and args.month:
+            generate_monthly_plan(args.year, args.month)
+        else:
+            # 다음 달 자동 계산 (기존 gemini_parser 로직 활용)
+            from tools.gemini_parser import get_next_month
+            nxt_y, nxt_m = get_next_month()
+            print(f"📅 연/월 생략됨. 자동으로 다음 달({nxt_y}년 {nxt_m}월) 데이터를 생성합니다.")
+            generate_monthly_plan(nxt_y, nxt_m)
     elif args.command == "send":
         await broadcast_messages()
     elif args.command == "run":
+        year = args.year if args.year else now.year
+        month = args.month if args.month else now.month
         await run_smart_mode(year, month)
 
 if __name__ == "__main__":

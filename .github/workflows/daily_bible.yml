@@ -33,4 +33,4 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run script
-        run: python send_bible_passage_all.py
+        run: python main.py send

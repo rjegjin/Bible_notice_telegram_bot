@@ -34,16 +34,16 @@ jobs:
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
-          # 인자 없이 실행하면 코드 내부에서 자동으로 '다음 달'을 계산함
-          python tools/gemini_parser.py
+          # main.py parse를 실행하면 자동으로 '다음 달'을 계산함
+          python main.py parse
 
       - name: Commit and Push changes
         run: |
           git config --global user.name "BibleBot Manager"
           git config --global user.email "actions@github.com"
           
-          # plans 폴더에 변경사항이 있는지 확인
-          git add plans/*.json
+          # data/plans 폴더에 변경사항이 있는지 확인
+          git add data/plans/*.json
           
           # 변경사항이 없으면 에러 없이 종료, 있으면 커밋
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update monthly bible plan" && git push)
