@@ -87,12 +87,12 @@ def generate_monthly_plan(year, month):
         
         Rules:
         1. Key: Day string (e.g., "1", "2").
-        2. Value: A list ["NT", "Psalms", "Proverbs", "QT"].
-           - "NT", "Psalms", "Proverbs" are from the BR image.
+        2. Value: A list ["OT", "NT", "Psalms", "Proverbs", "QT"].
+           - "OT", "NT", "Psalms", "Proverbs" are from the BR image.
            - "QT" is from the QT image.
         3. Valid Bible abbreviations for NT/OT: {valid_abbrs}
-        4. If an image is missing, leave the corresponding values empty ("").
-        5. Output Example: {{"1": ["마1", "시1", "잠1", "삼상1"]}}
+        4. If a category (like OT) is missing for a day, leave it as an empty string ("").
+        5. Output Example: {{"1": ["창1", "마1", "시1", "잠1", "삼상1"]}}
         
         Return ONLY raw JSON. No code blocks.
         """
