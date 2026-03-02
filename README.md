@@ -21,11 +21,25 @@
 
 이 프로젝트를 실행하려면 다음 항목이 준비되어야 합니다.
 
-1.  **Python 3.10+**: 시스템에 설치되어 있어야 합니다.
-2.  **API 키 발급**:
-    *   **Telegram Bot Token**: [@BotFather](https://t.me/botfather)에게 메시지를 보내 생성하세요.
-    *   **Google Gemini API Key**: [Google AI Studio](https://aistudio.google.com/)에서 무료로 발급받으세요.
-3.  **Chat ID 확인**: 본인의 텔레그램 ID(숫자)를 확인하세요. ([@userinfobot](https://t.me/userinfobot) 활용)
+### 1. 필수 도구 및 계정
+*   **Python 3.10+**: 시스템에 설치되어 있어야 합니다.
+*   **Telegram Bot Token**: [@BotFather](https://t.me/botfather)에게 메시지를 보내 생성하세요.
+*   **Google Gemini API Key**: [Google AI Studio](https://aistudio.google.com/)에서 무료로 발급받으세요.
+
+### 2. 지원되는 이미지 형식 (Supported Image Formats)
+Gemini AI가 분석 가능한 다음의 이미지 형식을 준비하세요.
+*   **형식**: `JPG`, `JPEG`, `PNG`, `WEBP`
+*   **권장 사항**: 텍스트가 선명하게 보이는 고해상도 이미지일수록 AI 분석 정확도가 높아집니다.
+
+### 3. Telegram Chat ID 확인 방법
+메시지를 받을 대상에 따라 Chat ID 형식이 다릅니다.
+
+*   **개인 대화 (1:1)**:
+    *   텔레그램에서 [@userinfobot](https://t.me/userinfobot) 검색 후 `/start`를 누르면 나오는 `Id` 숫자(예: `12345678`)를 사용합니다.
+*   **단체 대화방 (Group)**:
+    *   알림을 보낼 그룹 방에 봇을 초대합니다.
+    *   해당 방에서 [@get_id_bot](https://t.me/get_id_bot)을 초대하거나, 웹 브라우저 주소창 또는 API를 통해 확인합니다.
+    *   **주의**: 단체방 ID는 보통 **마이너스(`-`) 기호**로 시작합니다 (예: `-100123456789`). 이 기호까지 모두 포함하여 입력해야 합니다.
 
 ---
 
@@ -56,10 +70,10 @@ TELEGRAM_TOKEN=your_telegram_bot_token_here
 # Google Gemini API 키
 GOOGLE_API_KEY=your_gemini_api_key_here
 
-# 수신처 Chat ID (여러 개일 경우 각각 입력)
-KO_CHAT_ID=12345678  # 한국어 수신용
-EN_CHAT_ID=23456789  # 영어 수신용
-MN_CHAT_ID=34567890  # 몽골어 수신용
+# 수신처 Chat ID (예시)
+KO_CHAT_ID=12345678        # 개인 대화 ID (양수)
+EN_CHAT_ID=-100123456789   # 단체 대화방 ID (음수, - 포함)
+MN_CHAT_ID=34567890
 ```
 
 ---
@@ -71,7 +85,7 @@ MN_CHAT_ID=34567890  # 몽골어 수신용
 ### Step 1: 성경 읽기표 이미지 변환 (AI 파싱)
 매달 한 번만 실행하면 됩니다.
 
-1.  월간 읽기표 이미지를 `assets/` 폴더에 넣습니다.
+1.  월간 읽기표 이미지를 `assets/` 폴더에 넣습니다. (파일 확장자: .jpg, .png 등)
 2.  아래 명령어를 실행합니다 (예: 2026년 3월 데이터 생성 시).
     ```bash
     python tools/gemini_parser.py 2026 3
@@ -92,7 +106,7 @@ python send_bible_passage_all.py
 
 ```text
 .
-├── assets/                 # 성경 읽기표/QT 이미지 보관
+├── assets/                 # 성경 읽기표/QT 이미지 보관 (.jpg, .png, .webp)
 ├── plans/                  # Gemini가 생성한 월별 읽기 데이터 (JSON)
 ├── tools/                  # 관리자용 도구 모음
 │   ├── gemini_parser.py    # 이미지 -> JSON 변환 AI 도구
@@ -118,8 +132,8 @@ python send_bible_passage_all.py
 **Q: 특정 날짜의 본문이 틀리게 분석되었어요.**
 A: `plans/*.json` 파일을 열어 해당 날짜의 텍스트를 수동으로 수정한 뒤 저장하면 됩니다.
 
-**Q: 지원하는 성경 버전을 바꾸고 싶어요.**
-A: `bible_common.py` 내의 DB 쿼리 부분에서 테이블 이름을 변경하거나, `assets/` 내의 텍스트 파일을 새로 파싱하여 DB를 업데이트할 수 있습니다.
+**Q: 단체방에 메시지가 안 가요.**
+A: Chat ID에 마이너스(`-`) 기호가 포함되어 있는지 확인하고, 봇이 해당 방에 '관리자' 혹은 '메시지 전송 권한'이 있는 멤버로 초대되어 있는지 확인하세요.
 
 ---
 
