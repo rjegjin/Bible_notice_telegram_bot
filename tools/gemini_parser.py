@@ -7,10 +7,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 
+# 프로젝트 루트 경로 추가 (core 모듈 임포트용)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+
+from core.bible_scripture_resolver import BIBLE_MAP
+
 # ==========================================
 # ⚙️ 경로 및 환경 설정
 # ==========================================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # [보안 패치] 중앙 .env 로드 로직
 def load_central_env():
@@ -74,6 +79,8 @@ def generate_monthly_plan(year, month):
             contents.append(PIL.Image.open(qt_path))
             image_info.append("QT Passage (QT)")
 
+        valid_abbrs = ", ".join(list(BIBLE_MAP.keys()))
+
         prompt = f"""
         You are a data assistant. Parse the provided image(s) for {year_str}-{month_str}.
         Images provided: {', '.join(image_info)}
@@ -83,8 +90,9 @@ def generate_monthly_plan(year, month):
         2. Value: A list ["NT", "Psalms", "Proverbs", "QT"].
            - "NT", "Psalms", "Proverbs" are from the BR image.
            - "QT" is from the QT image.
-        3. If an image is missing, leave the corresponding values empty ("").
-        4. Output Example: {{"1": ["마1", "시1", "잠1", "삼상1"]}}
+        3. Valid Bible abbreviations for NT/OT: {valid_abbrs}
+        4. If an image is missing, leave the corresponding values empty ("").
+        5. Output Example: {{"1": ["마1", "시1", "잠1", "삼상1"]}}
         
         Return ONLY raw JSON. No code blocks.
         """
@@ -123,10 +131,6 @@ if __name__ == "__main__":
         generate_monthly_plan(input_year, input_month)
     else:
         # 사용자 입력 대신 자동 계산 로직
-        # 로컬 테스트용 input()은 주석 처리하거나, 조건문으로 분기 가능하지만
-        # 자동화를 위해 기본 동작을 '다음 달 계산'으로 설정합니다.
-        
-        # 만약 로컬에서 수동 입력을 계속 쓰고 싶다면:
         if sys.stdin.isatty(): # 사람이 터미널에서 실행했을 때
             try:
                 print("=== 📅 월간 성경읽기 생성기 (수동 모드) ===")

@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 from telegram import Bot
 from dotenv import load_dotenv
 
-# [필수] bible_common.py가 같은 폴더에 있어야 합니다.
-from core.bible_common import get_chapter_text, get_qt_text, split_text_for_telegram, translate_citation
+# [필수] bible_scripture_resolver.py가 같은 폴더에 있어야 합니다.
+from core.bible_scripture_resolver import get_chapter_text, get_qt_text, split_text_for_telegram, translate_citation
 
 load_dotenv()
 
