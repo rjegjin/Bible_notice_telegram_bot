@@ -46,6 +46,9 @@ async def run_smart_mode(year, month):
     if check_plan_exists(year, month):
         print(f"🚀 {year}년 {month}월 본문 발송을 시작합니다...")
         await broadcast_messages()
+        # [수정] 단체방 발송 후 개인 요약본도 함께 발송하도록 추가
+        print(f"💌 개인방(Mydailybot)으로 3개 국어 요약본을 발송합니다...")
+        await send_only_summaries("5929322817")
     else:
         print(f"❌ 데이터를 찾거나 생성할 수 없습니다. assets/ 폴더의 파일명을 확인해주세요.")
 
