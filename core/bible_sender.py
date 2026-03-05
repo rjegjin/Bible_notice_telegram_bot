@@ -78,15 +78,16 @@ def format_summary(row, lang_code, date_str):
     
     return "\n".join(summary_lines)
 
-async def send_only_summaries(chat_id):
+async def send_only_summaries(chat_id, kst_now):
     """사용자가 요청한 ID로 3개 국어 요약본만 발송"""
     if not TELEGRAM_TOKEN: return
     bot = Bot(token=TELEGRAM_TOKEN)
-    kst_now = datetime.utcnow() + timedelta(hours=9)
     day_str = str(kst_now.day)
     plan = load_monthly_plan(kst_now.month)
     
-    if day_str not in plan: return
+    if day_str not in plan: 
+        print(f"ℹ️ [요약본] 데이터 없음: {kst_now.month}월 {day_str}일")
+        return
     row = plan[day_str]
     date_display = kst_now.strftime('%Y/%m/%d')
 
@@ -96,20 +97,19 @@ async def send_only_summaries(chat_id):
         await asyncio.sleep(0.5)
     print(f"✅ 개인 대화방({chat_id}) 요약본 발송 완료")
 
-async def broadcast_messages():
+async def broadcast_messages(kst_now):
     if not TELEGRAM_TOKEN:
         print("❌ 설정 오류: TELEGRAM_TOKEN 없음")
-        return
+        return False
 
     bot = Bot(token=TELEGRAM_TOKEN)
-    kst_now = datetime.utcnow() + timedelta(hours=9)
     current_month = kst_now.month
     day_str = str(kst_now.day)
     
     plan = load_monthly_plan(current_month)
     if day_str not in plan:
-        print(f"ℹ️ 데이터 없음: {current_month}월 {day_str}일")
-        return
+        print(f"ℹ️ [단체방] 데이터 없음: {current_month}월 {day_str}일")
+        return False
 
     row = plan[day_str]
     raw_nt, raw_ot, raw_ps, raw_pr, raw_qt = (row + [""] * 5)[:5]
@@ -151,3 +151,4 @@ async def broadcast_messages():
                 print(f"   ❌ [{lang_code}] 전송 실패: {e}")
 
     print("🏁 전체 발송 완료")
+    return True
