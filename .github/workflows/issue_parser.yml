@@ -1,0 +1,52 @@
+name: Issue Triggered Plan Parser
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  parse-and-commit:
+    # 제목에 '플랜' 또는 'plan'이라는 단어가 들어갈 때만 실행
+    if: contains(github.event.issue.title, '플랜') || contains(github.event.issue.title, 'plan') || contains(github.event.issue.title, 'Plan')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install Pillow
+
+      - name: Run Issue Parser
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          python tools/issue_to_plan.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "BibleBot Manager"
+          git config --global user.email "actions@github.com"
+          git add data/plans/*.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "feat: generate plan from issue #${{ github.event.issue.number }}" && git push)
+
+      - name: Close Issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.html_url }} -b "✅ 파싱이 완료되어 새로운 JSON 플랜 파일이 추가되었습니다!"
+          gh issue close ${{ github.event.issue.html_url }}
