@@ -100,6 +100,7 @@ def generate_monthly_plan(year, month):
         
         IMAGE 2 (QT):
         Extract the "QT" passage for each day from the calendar image.
+        BE EXTREMELY CAREFUL with chapter and verse numbers. Double-check numbers like 4, 6, 8, 9 so you do not misread them (e.g., do not misread '눅 8:4-15' as '눅 4:4-15'). Use the exact numbers written in the calendar.
         
         Return ONLY raw JSON in this EXACT format for ALL DAYS from 1 to {month_str} (Notice key 1 has empty NT/OT in this example, and YOU MUST continue up to the last day of the month):
         {{

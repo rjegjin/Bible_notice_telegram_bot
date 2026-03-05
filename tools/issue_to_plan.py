@@ -74,6 +74,7 @@ def main():
     If a cell contains a book name (e.g., "창 1-3", "막 1-2"), you MUST include the book name ("창", "막"). Pay close attention to changes in book names (e.g., '막', '눅', '출', etc.) and extract exactly what is written.
     
     QT: Extract the "QT" passage for each day.
+    BE EXTREMELY CAREFUL with chapter and verse numbers. Double-check numbers like 4, 6, 8, 9 so you do not misread them (e.g., do not misread '눅 8:4-15' as '눅 4:4-15'). Use the exact numbers written in the calendar.
     
     Return ONLY raw JSON in this format (YOU MUST extract data for ALL days up to the end of the month):
     {{
