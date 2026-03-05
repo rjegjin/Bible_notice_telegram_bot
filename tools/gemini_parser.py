@@ -83,24 +83,32 @@ def generate_monthly_plan(year, month):
 
         prompt = f"""
         You are a Bible data extraction expert. I am providing TWO images for the {year_str}-{month_str} plan.
-        1. IMAGE 1 (Bible Reading Plan): Contains columns for NT, OT, Psalms, and Proverbs.
-        2. IMAGE 2 (QT Passage List): Contains the "QT" passage for each day.
         
-        Rules:
-        1. Output format: Exactly 5 strings per day: ["NT", "OT", "Psalms", "Proverbs", "QT"].
-        2. FROM IMAGE 1 (Columns left to right):
-           - NT: New Testament
-           - OT: Old Testament
-           - Psalms: 시편/시
-           - Proverbs: 잠언/잠
-        3. FROM IMAGE 2 (CRITICAL):
-           - Extract the "QT" passage for each day. DO NOT leave this empty if it's visible in the second image.
-        4. OMITTED BOOK NAMES: If NT/OT/Psalms/Proverbs columns only have numbers (e.g., "1-3"), extract exactly those numbers.
-        5. QT FORMAT: Use short abbreviations (e.g., "마 1:1-17"). If only "1:1-17" is shown, assume "마" (Matthew).
-        6. MON-SAT: Every day must have all 5 values.
+        IMAGE 1 (Bible Reading Plan) DETAILS:
+        - Contains columns: Date, 신약 (NT), 구약 (OT), 시 (Psalms), 잠 (Proverbs).
+        - Layout: Two side-by-side tables (1-16 on left, 17-31 on right).
         
-        Return ONLY raw JSON. No markdown code blocks.
-        Output Example: {{"1": ["마 1-2", "창 1-3", "시 1", "잠 1", "마 1:1-17"]}}
+        STRICT EXTRACTION RULES:
+        1. NT & OT BOOK NAMES:
+           - Dates 2-10: 신약 is '마' (Matthew).
+           - Date 11 (IMPORTANT): 신약 explicitly changes to '막' (Mark). You MUST extract '막'.
+           - Date 25 (IMPORTANT): 신약 explicitly changes to '요' (John). You MUST extract '요'.
+           - Date 2: 구약 is '창' (Genesis).
+           - Date 21 (IMPORTANT): 구약 explicitly changes to '출' (Exodus). You MUST extract '출'.
+        2. SUNDAYS (Dates 1, 8, 15, 22, 29):
+           - In IMAGE 1, the '신약' and '구약' columns for these dates are COMPLETELY BLANK.
+           - You MUST return an empty string "" for NT and OT on these dates.
+        3. DATE RANGE: Provide data for every single day from 1 to {month_str}.
+        4. IMAGE 2 (QT): Extract the "QT" passage for each day from the calendar image.
+        
+        Return ONLY raw JSON in this format:
+        {{
+          "1": ["", "", "1", "1", "시 23:1-6"],
+          "2": ["마 1-2", "창 1-3", "2", "2", "사 53:1-12"],
+          ...
+          "11": ["막 1-2", "25-27", "11", "11", "잠 1:1-12"],
+          ...
+        }}
         """
         contents.insert(0, prompt)
 
@@ -119,6 +127,9 @@ def generate_monthly_plan(year, month):
         import re
         last_books = ["", "", "", "", ""]
         
+        # 성경 권수 약어 허용 리스트 (Resolver의 BIBLE_MAP 기반)
+        ALLOWED_BOOKS = set(BIBLE_MAP.keys())
+
         # 풀네임 -> 약어 변환 매핑 (예외 처리용)
         full_to_abbr = {
             "마태복음": "마", "마가복음": "막", "누가복음": "눅", "요한복음": "요", "사도행전": "행",
@@ -151,11 +162,19 @@ def generate_monthly_plan(year, month):
                 
                 # 2. 권수 상속 로직 (QT 제외, 0~3번 인덱스만)
                 if i < 4:
-                    match = re.match(r"^([가-힣]+)", cell)
+                    # 권수 추출 (문자로 시작하는 부분)
+                    match = re.match(r"^([가-힣\d]+)", cell)
                     if match:
-                        last_books[i] = match.group(1)
-                    elif last_books[i] and re.match(r"^\d", cell):
-                        # 문자로 시작하지 않고 숫자(장)로만 시작하면 이전 권수 붙이기
+                        potential_book = match.group(1)
+                        # 숫자가 포함된 권수(고전, 벧전 등) 처리 및 허용 리스트 확인
+                        if potential_book in ALLOWED_BOOKS:
+                            last_books[i] = potential_book
+                        elif re.match(r"^\d", cell):
+                            # 숫자로 시작하는 경우(장수만 있는 경우) 상속
+                            if last_books[i]:
+                                row[i] = f"{last_books[i]} {cell}"
+                    elif last_books[i]:
+                        # 아예 숫자로만 되어 있는 경우 등
                         row[i] = f"{last_books[i]} {cell}"
                 
                 # 3. QT(인덱스 4)에 장절만 있는 경우 기본값(마태복음) 추가
