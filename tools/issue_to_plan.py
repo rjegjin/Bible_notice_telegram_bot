@@ -59,20 +59,29 @@ def main():
     You are a Bible data extraction expert. I am providing images for the {year}-{month_str} plan.
     
     IMAGE DETAILS:
-    - Contains columns: Date, 신약 (NT), 구약 (OT), 시 (Psalms), 잠 (Proverbs).
+    - Contains columns: Date (날짜), 신약 (NT), 구약 (OT), 시 (Psalms), 잠 (Proverbs).
     - Contains "QT" passage for each day.
     
-    STRICT EXTRACTION RULES:
-    1. Read the books exactly as they appear in the image. DO NOT assume the starting books are Matthew or Genesis unless explicitly written. Pay close attention to changes in book names and extract exactly what is written.
-    2. SUNDAYS (Blank rows in the image):
-       - If the '신약' and '구약' columns are COMPLETELY BLANK for certain dates, you MUST return an empty string "" for NT and OT.
-    3. DATE RANGE: Provide data for every single day from 1 to {month_str}.
-    4. QT: Extract the "QT" passage for each day.
+    CRITICAL INSTRUCTION FOR DATES (DO NOT SHIFT):
+    The very first column in the table is the "Date" (1, 2, 3...). 
+    You MUST map the exact printed Date to the JSON key.
+    - If the Date is "1" (Sunday) and the '신약' and '구약' columns are BLANK in the image, you MUST return an empty string "" for NT and OT for key "1".
+    - If Date "2" says "막 1-2" and "창 1-3", you MUST map these to the key "2".
+    - If Date "5" says "막 7-8" and "창 10-12", it goes to key "5".
+    DO NOT shift the rows. Row for Date N must be key "N" in JSON.
+    
+    EXTRACT BOOK NAMES EXACTLY:
+    If a cell contains a book name (e.g., "창 1-3", "막 1-2"), you MUST include the book name ("창", "막"). Pay close attention to changes in book names (e.g., '막', '눅', '출', etc.) and extract exactly what is written.
+    
+    QT: Extract the "QT" passage for each day.
     
     Return ONLY raw JSON in this format:
     {{
       "1": ["", "", "1", "1", "시 23:1-6"],
-      "2": ["막 1-2", "창 1-3", "2", "2", "사 53:1-12"]
+      "2": ["막 1-2", "창 1-3", "2", "2", "사 53:1-12"],
+      "3": ["막 3-4", "창 4-6", "3", "3", "시 1:1-6"],
+      "4": ["막 5-6", "창 7-9", "4", "4", "요 10:1-30"],
+      "5": ["막 7-8", "창 10-12", "5", "5", "엡 5:1-21"]
     }}
     """
     contents.append(prompt)
