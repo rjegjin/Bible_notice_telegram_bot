@@ -89,25 +89,17 @@ def generate_monthly_plan(year, month):
         - Layout: Two side-by-side tables (1-16 on left, 17-31 on right).
         
         STRICT EXTRACTION RULES:
-        1. NT & OT BOOK NAMES:
-           - Dates 2-10: 신약 is '마' (Matthew).
-           - Date 11 (IMPORTANT): 신약 explicitly changes to '막' (Mark). You MUST extract '막'.
-           - Date 25 (IMPORTANT): 신약 explicitly changes to '요' (John). You MUST extract '요'.
-           - Date 2: 구약 is '창' (Genesis).
-           - Date 21 (IMPORTANT): 구약 explicitly changes to '출' (Exodus). You MUST extract '출'.
-        2. SUNDAYS (Dates 1, 8, 15, 22, 29):
-           - In IMAGE 1, the '신약' and '구약' columns for these dates are COMPLETELY BLANK.
-           - You MUST return an empty string "" for NT and OT on these dates.
+        1. Read the books exactly as they appear in the image. DO NOT assume the starting books are Matthew or Genesis unless explicitly written. Pay close attention to changes in book names (e.g., '막', '눅', '출', etc.) and extract exactly what is written.
+        2. SUNDAYS (Blank rows in the image):
+           - If the '신약' and '구약' columns are COMPLETELY BLANK for certain dates (typically Sundays), you MUST return an empty string "" for NT and OT.
         3. DATE RANGE: Provide data for every single day from 1 to {month_str}.
         4. IMAGE 2 (QT): Extract the "QT" passage for each day from the calendar image.
         
-        Return ONLY raw JSON in this format:
+        Return ONLY raw JSON in this format (example only, follow the actual image):
         {{
           "1": ["", "", "1", "1", "시 23:1-6"],
-          "2": ["마 1-2", "창 1-3", "2", "2", "사 53:1-12"],
-          ...
-          "11": ["막 1-2", "25-27", "11", "11", "잠 1:1-12"],
-          ...
+          "2": ["막 1-2", "창 1-3", "2", "2", "사 53:1-12"],
+          "3": ["막 3-4", "창 4-6", "3", "3", "시 1:1-6"]
         }}
         """
         contents.insert(0, prompt)
