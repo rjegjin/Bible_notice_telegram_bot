@@ -75,13 +75,14 @@ def main():
     
     QT: Extract the "QT" passage for each day.
     
-    Return ONLY raw JSON in this format:
+    Return ONLY raw JSON in this format (YOU MUST extract data for ALL days up to the end of the month):
     {{
       "1": ["", "", "1", "1", "시 23:1-6"],
       "2": ["막 1-2", "창 1-3", "2", "2", "사 53:1-12"],
       "3": ["막 3-4", "창 4-6", "3", "3", "시 1:1-6"],
       "4": ["막 5-6", "창 7-9", "4", "4", "요 10:1-30"],
-      "5": ["막 7-8", "창 10-12", "5", "5", "엡 5:1-21"]
+      "5": ["막 7-8", "창 10-12", "5", "5", "엡 5:1-21"],
+      ... (CONTINUE FOR ALL DAYS UNTIL THE END OF THE MONTH) ...
     }}
     """
     contents.append(prompt)

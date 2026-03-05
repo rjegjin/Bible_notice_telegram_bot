@@ -101,13 +101,14 @@ def generate_monthly_plan(year, month):
         IMAGE 2 (QT):
         Extract the "QT" passage for each day from the calendar image.
         
-        Return ONLY raw JSON in this EXACT format (Notice key 1 has empty NT/OT):
+        Return ONLY raw JSON in this EXACT format for ALL DAYS from 1 to {month_str} (Notice key 1 has empty NT/OT in this example, and YOU MUST continue up to the last day of the month):
         {{
           "1": ["", "", "1", "1", "시 23:1-6"],
           "2": ["막 1-2", "창 1-3", "2", "2", "사 53:1-12"],
           "3": ["막 3-4", "창 4-6", "3", "3", "시 1:1-6"],
           "4": ["막 5-6", "창 7-9", "4", "4", "요 10:1-30"],
-          "5": ["막 7-8", "창 10-12", "5", "5", "엡 5:1-21"]
+          "5": ["막 7-8", "창 10-12", "5", "5", "엡 5:1-21"],
+          ... (CONTINUE FOR ALL DAYS UNTIL THE END OF THE MONTH) ...
         }}
         """
         contents.insert(0, prompt)
