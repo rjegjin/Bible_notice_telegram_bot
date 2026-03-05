@@ -88,13 +88,12 @@ def generate_monthly_plan(year, month):
         - Contains columns: Date (날짜), 신약 (NT), 구약 (OT), 시 (Psalms), 잠 (Proverbs).
         - Layout: Two side-by-side tables (1-16 on left, 17-31 on right).
         
-        CRITICAL INSTRUCTION FOR DATES (DO NOT SHIFT):
-        The very first column in the table is the "Date" (1, 2, 3...). 
-        You MUST map the exact printed Date to the JSON key.
-        - For March 2026, Date "1" (March 1st) is a Sunday. The '신약' and '구약' columns are BLANK in the image. You MUST return an empty string "" for NT and OT for key "1".
-        - Date "2" (March 2nd) is Monday. The '신약' says "막 1-2" and '구약' says "창 1-3". You MUST map these to the key "2".
-        - Date "5" (March 5th) is Thursday. It says "막 7-8" and "창 10-12". This goes to key "5".
-        DO NOT shift the rows. Row for Date N must be key "N" in JSON.
+        CRITICAL INSTRUCTION FOR DATES (ABSOLUTELY DO NOT SHIFT):
+        Look EXACTLY at the "Date" column number.
+        - Look at the row for Date "1" (March 1st). The '신약' and '구약' cells are BLANK. Therefore, your JSON MUST have `""` (empty string) for NT and OT in key "1".
+        - Look at the row for Date "2" (March 2nd). The '신약' cell says "막 1-2" and '구약' cell says "창 1-3". Your JSON MUST have `"막 1-2"` and `"창 1-3"` in key "2".
+        - Look at the row for Date "5" (March 5th). The '신약' cell says "막 7-8" and '구약' cell says "창 10-12". Your JSON MUST have these in key "5".
+        If you put "막 1-2" into key "1", you have failed. The row numbers must match the printed Date perfectly.
         
         EXTRACT BOOK NAMES EXACTLY:
         If a cell contains a book name (e.g., "창 1-3", "막 1-2"), you MUST include the book name ("창", "막"). Pay close attention to changes in book names (e.g., '막', '눅', '출', etc.) and extract exactly what is written.
@@ -102,7 +101,7 @@ def generate_monthly_plan(year, month):
         IMAGE 2 (QT):
         Extract the "QT" passage for each day from the calendar image.
         
-        Return ONLY raw JSON in this format:
+        Return ONLY raw JSON in this EXACT format (Notice key 1 has empty NT/OT):
         {{
           "1": ["", "", "1", "1", "시 23:1-6"],
           "2": ["막 1-2", "창 1-3", "2", "2", "사 53:1-12"],
