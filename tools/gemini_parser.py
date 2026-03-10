@@ -88,29 +88,28 @@ def generate_monthly_plan(year, month):
         - Contains columns: Date (날짜), 신약 (NT), 구약 (OT), 시 (Psalms), 잠 (Proverbs).
         - Layout: Two side-by-side tables (1-16 on left, 17-31 on right).
         
-        CRITICAL INSTRUCTION FOR DATES (ABSOLUTELY DO NOT SHIFT):
-        Look EXACTLY at the "Date" column number.
-        - Look at the row for Date "1" (March 1st). The '신약' and '구약' cells are BLANK. Therefore, your JSON MUST have `""` (empty string) for NT and OT in key "1".
-        - Look at the row for Date "2" (March 2nd). The '신약' cell says "막 1-2" and '구약' cell says "창 1-3". Your JSON MUST have `"막 1-2"` and `"창 1-3"` in key "2".
-        - Look at the row for Date "5" (March 5th). The '신약' cell says "막 7-8" and '구약' cell says "창 10-12". Your JSON MUST have these in key "5".
-        If you put "막 1-2" into key "1", you have failed. The row numbers must match the printed Date perfectly.
+        CRITICAL INSTRUCTION FOR IMAGE 1:
+        1. Look EXACTLY at the "Date" column number.
+        2. Match the row content to that date. 
+        3. If a cell is blank (especially NT/OT on Sundays), use `""`.
+        4. Capture the Bible book names (e.g., '막', '눅', '창', '출') carefully. They often only appear on the first day of the week or when the book changes.
         
-        EXTRACT BOOK NAMES EXACTLY:
-        If a cell contains a book name (e.g., "창 1-3", "막 1-2"), you MUST include the book name ("창", "막"). Pay close attention to changes in book names (e.g., '막', '눅', '출', etc.) and extract exactly what is written.
+        IMAGE 2 (QT Calendar) DETAILS:
+        - This is a monthly calendar grid.
+        - Each box contains a Date number and a QT passage.
+        - IMPORTANT: On Sundays (SUN), the passage starts with a book name like '시편' or '잠언'.
+        - IMPORTANT: On Weekdays (MON-SAT), if only numbers like "1: 18-25" are shown, it INHERITS the book name from the previous day. For example, if Monday was "마1: 1-17", then Tuesday "1: 18-25" is "마 1:18-25".
+        - DO NOT assume a book name like '잠언' from Sunday applies to the rest of the week unless explicitly written. Most weekdays this month are in the book of Matthew (마).
         
-        IMAGE 2 (QT):
-        Extract the "QT" passage for each day from the calendar image.
-        BE EXTREMELY CAREFUL with chapter and verse numbers. Double-check numbers like 4, 6, 8, 9 so you do not misread them (e.g., do not misread '눅 8:4-15' as '눅 4:4-15'). Use the exact numbers written in the calendar.
-        
-        Return ONLY raw JSON in this EXACT format for ALL DAYS from 1 to {month_str} (Notice key 1 has empty NT/OT in this example, and YOU MUST continue up to the last day of the month):
+        Return ONLY raw JSON in this EXACT format for ALL DAYS from 1 to {month_str}:
         {{
-          "1": ["", "", "1", "1", "시 23:1-6"],
-          "2": ["막 1-2", "창 1-3", "2", "2", "사 53:1-12"],
-          "3": ["막 3-4", "창 4-6", "3", "3", "시 1:1-6"],
-          "4": ["막 5-6", "창 7-9", "4", "4", "요 10:1-30"],
-          "5": ["막 7-8", "창 10-12", "5", "5", "엡 5:1-21"],
-          ... (CONTINUE FOR ALL DAYS UNTIL THE END OF THE MONTH) ...
+          "1": ["NT", "OT", "Ps_Chap", "Pr_Chap", "QT_Passage"],
+          ...
         }}
+        
+        Example for row 10 (March 10th):
+        "10": ["15-16", "22-24", "10", "10", "마 1:18-25"]
+        (Note: The NT/OT book names will be handled by post-processing if missing, but try to include them if you see them.)
         """
         contents.insert(0, prompt)
 
