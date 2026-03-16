@@ -34,6 +34,3 @@ jobs:
 
       - name: Run script (Smart Mode)
         run: python main.py
-
-      - name: Send personal summary (Mydailybot)
-        run: python main.py summary

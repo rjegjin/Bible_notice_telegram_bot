@@ -1,5 +1,8 @@
 # Development Log - Bible Notice Telegram Bot
 
+## [2026-03-17]
+- GitHub Actions 중복 발송 버그 수정 및 플랜 파서 로직 검증
+
 ## 2026-03-02: 대규모 아키텍처 개편 및 로직 고도화 완료
 
 ### ✅ [NEW] 최종 완료 사항
