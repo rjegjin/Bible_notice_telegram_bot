@@ -1,6 +1,7 @@
 import os
 import json
 import sys
+import re
 import PIL.Image
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -34,9 +35,7 @@ GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 def get_next_month():
     """오늘 날짜를 기준으로 '다음 달'의 연도와 월을 반환"""
-    # 현재 날짜 (KST 기준 보정 없이 UTC로 해도 무방, 월 단위 계산이므로)
     today = datetime.now()
-    # 28일 + 4일 = 다음 달 1일 or 2일 (안전하게 다음 달로 넘어감)
     next_month_date = today.replace(day=28) + timedelta(days=4)
     return next_month_date.year, next_month_date.month
 
@@ -48,38 +47,44 @@ def generate_monthly_plan(year, month):
     year_str = str(year)
     month_str = str(month).zfill(2)
     assets_dir = os.path.join(BASE_DIR, 'assets')
-    
-    # [업그레이드] 확장자 유연성 확보 (.png, .jpg, .jpeg)
-    def find_image(prefix):
+
+    def find_local_image(prefix):
         for ext in ['.png', '.jpg', '.jpeg']:
             path = os.path.join(assets_dir, f"{year_str}년_{month_str}월_{prefix}_passage{ext}")
             if os.path.exists(path):
                 return path
         return None
 
-    br_path = find_image("BR")
-    qt_path = find_image("QT")
+    br_path = find_local_image("BR")
+    qt_path = find_local_image("QT")
 
-    if not br_path and not qt_path:
-        print(f"⚠️ {year_str}년 {month_str}월의 이미지 파일(BR 또는 QT)이 'assets' 폴더에 없습니다.")
-        return
+    print(f"\n🔍 [실행] {year_str}년 {month_str}월 데이터 생성 중...")
 
-    print(f"\n🔍 [자동 실행] {year_str}년 {month_str}월 데이터 생성 중...")
-    
     client = genai.Client(api_key=GOOGLE_API_KEY)
-    
+
     try:
         contents = []
         image_info = []
-        
-        if br_path:
-            contents.append(PIL.Image.open(br_path))
-            image_info.append("Bible Reading Plan (BR)")
-        if qt_path:
-            contents.append(PIL.Image.open(qt_path))
-            image_info.append("QT Passage (QT)")
 
-        valid_abbrs = ", ".join(list(BIBLE_MAP.keys()))
+        if br_path or qt_path:
+            if br_path:
+                contents.append(PIL.Image.open(br_path))
+                image_info.append("BR")
+            if qt_path:
+                contents.append(PIL.Image.open(qt_path))
+                image_info.append("QT")
+            print(f"  소스: 로컬 assets ({', '.join(image_info)})")
+        else:
+            print(f"  로컬 assets 없음 → Google Drive에서 검색합니다...")
+            from tools.gdrive_parser import fetch_images_from_drive
+            drive_images, image_info = fetch_images_from_drive(year, month)
+            if not drive_images:
+                print(f"⚠️ {year_str}년 {month_str}월의 이미지를 assets 폴더와 Google Drive 모두에서 찾지 못했습니다.")
+                return
+            for prefix in ["BR", "QT"]:
+                if prefix in drive_images:
+                    contents.append(drive_images[prefix])
+            print(f"  소스: Google Drive ({', '.join(image_info)})")
 
         prompt = f"""
         You are a Bible data extraction expert. I am providing TWO images for the {year_str}-{month_str} plan.
@@ -89,27 +94,22 @@ def generate_monthly_plan(year, month):
         - Layout: Two side-by-side tables (1-16 on left, 17-31 on right).
         
         CRITICAL INSTRUCTION FOR IMAGE 1:
-        1. Look EXACTLY at the "Date" column number.
-        2. Match the row content to that date. 
-        3. If a cell is blank (especially NT/OT on Sundays), use `""`.
-        4. Capture the Bible book names (e.g., '막', '눅', '창', '출') carefully. They often only appear on the first day of the week or when the book changes.
+        1. Look EXACTLY at the "Date" column number. Match the row content to that date. 
+        2. If a cell is blank (especially NT/OT on Sundays), use `""`.
+        3. Capture the Bible book names (e.g., '눅', '막', '창', '출') carefully. They often only appear on the first day of the week or when the book changes.
+        4. For Psalms (시) and Proverbs (잠) columns, just extract the numbers if that's all that is there.
         
         IMAGE 2 (QT Calendar) DETAILS:
-        - This is a monthly calendar grid.
-        - Each box contains a Date number and a QT passage.
-        - IMPORTANT: On Sundays (SUN), the passage starts with a book name like '시편' or '잠언'.
-        - IMPORTANT: On Weekdays (MON-SAT), if only numbers like "1: 18-25" are shown, it INHERITS the book name from the previous day. For example, if Monday was "마1: 1-17", then Tuesday "1: 18-25" is "마 1:18-25".
-        - DO NOT assume a book name like '잠언' from Sunday applies to the rest of the week unless explicitly written. Most weekdays this month are in the book of Matthew (마).
+        - This is a monthly calendar grid. Each box contains a Date number and a QT passage.
+        - IMPORTANT: On Sundays (SUN), the passage usually starts with a book name like '시편' or '잠언'.
+        - IMPORTANT: On Weekdays (MON-SAT), if only numbers like "1: 18-25" are shown, YOU MUST INFER the book name from the previous consecutive day. Output the full book abbreviation + chapter/verse.
         
-        Return ONLY raw JSON in this EXACT format for ALL DAYS from 1 to {month_str}:
+        Return ONLY raw JSON in this EXACT format for ALL DAYS from 1 to the end of the month:
         {{
           "1": ["NT", "OT", "Ps_Chap", "Pr_Chap", "QT_Passage"],
+          "2": ["...", "...", "...", "...", "..."],
           ...
         }}
-        
-        Example for row 10 (March 10th):
-        "10": ["15-16", "22-24", "10", "10", "마 1:18-25"]
-        (Note: The NT/OT book names will be handled by post-processing if missing, but try to include them if you see them.)
         """
         contents.insert(0, prompt)
 
@@ -121,17 +121,10 @@ def generate_monthly_plan(year, month):
         cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
         bible_data = json.loads(cleaned_text)
         
-        # 날짜순 정렬
         sorted_data = dict(sorted(bible_data.items(), key=lambda item: int(item[0])))
 
-        # 후처리: 권수가 생략되고 장수만 있는 경우 이전 날짜의 권수를 상속 (NT, OT, Psalms, Proverbs)
-        import re
-        last_books = ["", "", "", "", ""]
-        
-        # 성경 권수 약어 허용 리스트 (Resolver의 BIBLE_MAP 기반)
         ALLOWED_BOOKS = set(BIBLE_MAP.keys())
 
-        # 풀네임 -> 약어 변환 매핑 (예외 처리용)
         full_to_abbr = {
             "마태복음": "마", "마가복음": "막", "누가복음": "눅", "요한복음": "요", "사도행전": "행",
             "로마서": "롬", "고린도전서": "고전", "고린도후서": "고후", "갈라디아서": "갈", "에베소서": "엡",
@@ -149,39 +142,40 @@ def generate_monthly_plan(year, month):
             "스바냐": "습", "학개": "학", "스가랴": "슥", "말라기": "말"
         }
 
+        # 열별(NT, OT, QT) 이전 성경 권수 독립적 추적
+        last_books = {0: "", 1: "", 4: ""} 
+
         for day, row in sorted_data.items():
             for i in range(len(row)):
-                cell = row[i].strip()
+                cell = str(row[i]).strip()
                 if not cell: continue
                 
-                # 1. 풀네임 약어로 치환 (특히 QT에서 유용)
+                # 1. 풀네임 약어로 치환
                 for full, abbr in full_to_abbr.items():
                     if cell.startswith(full):
-                        cell = cell.replace(full, abbr, 1)
-                        row[i] = cell
+                        cell = cell.replace(full, abbr, 1).strip()
                         break
                 
-                # 2. 권수 상속 로직 (QT 제외, 0~3번 인덱스만)
-                if i < 4:
-                    # 권수 추출 (문자로 시작하는 부분)
-                    match = re.match(r"^([가-힣\d]+)", cell)
+                # 2. 열(Column) 특성에 맞춘 후처리 로직 분리
+                if i in [0, 1, 4]:  # 신약(NT), 구약(OT), QT
+                    # 권수 추출 (예: "눅 15-16", "고전 3")
+                    match = re.match(r"^([가-힣]+)\s*(.*)", cell)
                     if match:
-                        potential_book = match.group(1)
-                        # 숫자가 포함된 권수(고전, 벧전 등) 처리 및 허용 리스트 확인
-                        if potential_book in ALLOWED_BOOKS:
-                            last_books[i] = potential_book
-                        elif re.match(r"^\d", cell):
-                            # 숫자로 시작하는 경우(장수만 있는 경우) 상속
-                            if last_books[i]:
-                                row[i] = f"{last_books[i]} {cell}"
-                    elif last_books[i]:
-                        # 아예 숫자로만 되어 있는 경우 등
+                        book, chapters = match.groups()
+                        if book in ALLOWED_BOOKS:
+                            last_books[i] = book  # 새로운 성경 권수 업데이트
+                            row[i] = f"{book} {chapters}".strip()
+                    elif last_books[i] and re.match(r"^\d", cell):
+                        # 숫자로 시작하는 경우(장수만 있는 경우) 이전 권수 상속
                         row[i] = f"{last_books[i]} {cell}"
-                
-                # 3. QT(인덱스 4)에 장절만 있는 경우 기본값(마태복음) 추가
-                if i == 4:
+                        
+                elif i == 2:  # 시편 (Psalms)
                     if re.match(r"^\d", cell):
-                        row[i] = f"마{cell}"
+                        row[i] = f"시 {cell}"
+                        
+                elif i == 3:  # 잠언 (Proverbs)
+                    if re.match(r"^\d", cell):
+                        row[i] = f"잠 {cell}"
             
             sorted_data[day] = row
 
@@ -200,20 +194,23 @@ def generate_monthly_plan(year, month):
         sys.exit(1)
 
 if __name__ == "__main__":
-    # 인자가 있으면 그 날짜로, 없으면 '다음 달'로 자동 실행
+    now = datetime.now()
     if len(sys.argv) >= 3:
         input_year = sys.argv[1]
         input_month = sys.argv[2]
         generate_monthly_plan(input_year, input_month)
+    elif len(sys.argv) == 2:
+        input_year = now.year
+        input_month = sys.argv[1]
+        generate_monthly_plan(input_year, input_month)
     else:
-        # 사용자 입력 대신 자동 계산 로직
-        if sys.stdin.isatty(): # 사람이 터미널에서 실행했을 때
+        if sys.stdin.isatty():
             try:
                 print("=== 📅 월간 성경읽기 생성기 (수동 모드) ===")
-                y = input("연도: ").strip()
-                m = input("월: ").strip()
+                y = input(f"연도 (기본 {now.year}): ").strip() or now.year
+                m = input(f"월 (기본 {now.month}): ").strip() or now.month
                 generate_monthly_plan(y, m)
             except: pass
-        else: # GitHub Actions 등 자동화 환경일 때
+        else:
             next_year, next_month = get_next_month()
             generate_monthly_plan(next_year, next_month)
