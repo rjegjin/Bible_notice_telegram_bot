@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 전체 히스토리를 가져와야 rebase가 가능합니다.
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,9 +44,19 @@ jobs:
           git config --global user.name "BibleBot Manager"
           git config --global user.email "actions@github.com"
           git add data/plans/*.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "feat: generate plan from issue #${{ github.event.issue.number }}" && git push)
+          
+          # 변경사항이 있는 경우에만 처리
+          if [ -n "$(git status --porcelain)" ]; then
+            # 원격의 최신 내용을 가져와서 내 커밋을 그 위에 재배치(Rebase)
+            git pull --rebase origin main
+            git commit -m "feat: generate plan from issue #${{ github.event.issue.number }}"
+            git push origin main
+          else
+            echo "No changes to commit"
+          fi
 
       - name: Close Issue
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
