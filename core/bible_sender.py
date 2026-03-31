@@ -69,9 +69,8 @@ def format_summary(row, lang_code, date_str):
         f"{lang_pack['qt_label']}\n👉 {qt_display}\n",
         f"{lang_pack['rd_label']}"
     ]
-    summary_lines.append(f"▫️ {lang_pack['nt']}: {nt_display}")
-    if raw_ot:
-        summary_lines.append(f"▫️ {lang_pack['ot']}: {ot_display}")
+    summary_lines.append(f"▫️ {lang_pack['nt']}: {nt_display if raw_nt else lang_pack['none']}")
+    summary_lines.append(f"▫️ {lang_pack['ot']}: {ot_display if raw_ot else lang_pack['none']}")
     summary_lines.append(f"▫️ {lang_pack['ps']}: {ps_display}{lang_pack['unit_ps']}")
     summary_lines.append(f"▫️ {lang_pack['pr']}: {pr_display}{lang_pack['unit_pr']}\n")
     summary_lines.append(f"━━━━━━━━━━━━━━━\n\"{lang_pack['slogan']}\"")

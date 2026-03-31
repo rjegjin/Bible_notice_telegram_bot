@@ -17,7 +17,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # 전체 히스토리를 가져와서 pull/rebase가 가능하게 함
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -45,9 +45,11 @@ jobs:
           
           # 변경사항 확인 및 커밋 후 리베이스 진행
           git add data/plans/*.json
+          
+          # 변경사항이 있는지 확인
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "feat: generate plan from issue #${{ github.event.issue.number }}"
-            # 커밋된 상태에서 원격의 최신 내용을 가져와 내 커밋을 그 위로 옮김
+            # 커밋된 상태에서 원격의 최신 내용을 가져와 내 커밋을 그 위로 옮김 (충돌 방지)
             git pull --rebase origin main
             git push origin main
           else
