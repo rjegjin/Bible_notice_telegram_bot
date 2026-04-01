@@ -10,8 +10,8 @@ import logging
 import os
 import subprocess
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,18 +34,29 @@ def _trigger(cmd: str):
     return f"`{cmd}` 실행 시작됨"
 
 
-def _menu():
+def _menu_inline():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📤 오늘 말씀 발송 (send)",   callback_data="bible:send")],
         [InlineKeyboardButton("📋 요약만 발송 (summary)",   callback_data="bible:summary")],
         [InlineKeyboardButton("🔄 스마트 모드 (run)",       callback_data="bible:run")],
     ])
 
+def _menu_reply():
+    """하단에 항상 상주하는 메뉴 키보드"""
+    return ReplyKeyboardMarkup([
+        ["📤 말씀 발송", "📋 요약만 발송"],
+        ["🔄 스마트 모드"]
+    ], resize_keyboard=True)
+
 
 async def cmd_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📖 *Bible Notice Bot*\n동작을 선택하세요:",
-        parse_mode="Markdown", reply_markup=_menu()
+        "📖 *Bible Notice Bot*\n메뉴를 선택하세요:",
+        parse_mode="Markdown", reply_markup=_menu_reply()
+    )
+    await update.message.reply_text(
+        "원하시는 작업을 선택하세요:",
+        reply_markup=_menu_inline()
     )
 
 async def cmd_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,6 +68,20 @@ async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(await asyncio.to_thread(_trigger, "run"))
 
+async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """하단 상주 메뉴 버튼 클릭 처리"""
+    text = update.message.text
+
+    if text == "📤 말씀 발송":
+        msg = await asyncio.to_thread(_trigger, "send")
+        await update.message.reply_text(f"📖 *Bible Notice Bot*\n{msg}", parse_mode="Markdown")
+    elif text == "📋 요약만 발송":
+        msg = await asyncio.to_thread(_trigger, "summary")
+        await update.message.reply_text(f"📖 *Bible Notice Bot*\n{msg}", parse_mode="Markdown")
+    elif text == "🔄 스마트 모드":
+        msg = await asyncio.to_thread(_trigger, "run")
+        await update.message.reply_text(f"📖 *Bible Notice Bot*\n{msg}", parse_mode="Markdown")
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -64,7 +89,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await asyncio.to_thread(_trigger, cmd)
     await query.edit_message_text(
         f"📖 *Bible Notice Bot*\n{msg}",
-        parse_mode="Markdown", reply_markup=_menu()
+        parse_mode="Markdown", reply_markup=_menu_inline()
     )
 
 
@@ -90,6 +115,7 @@ def main():
     app.add_handler(CommandHandler("summary", cmd_summary))
     app.add_handler(CommandHandler("run",     cmd_run))
     app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_menu))
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
