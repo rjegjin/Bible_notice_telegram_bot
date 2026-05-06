@@ -4,11 +4,13 @@ import asyncio
 import re
 from datetime import datetime, timedelta
 from telegram import Bot
+from telegram.request import HTTPXRequest
 
 # [필수] bible_scripture_resolver.py가 같은 폴더에 있어야 합니다.
 from core.bible_scripture_resolver import get_chapter_text, get_qt_text, split_text_for_telegram, translate_citation
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+PROXY_URL = os.getenv('TELEGRAM_PROXY_URL')  # socks5://localhost:1080 등
 
 # --- 수신처 설정 ---
 RECIPIENTS = {
@@ -45,6 +47,13 @@ translations = {
     }
 }
 
+def _create_bot():
+    """프록시 설정을 포함한 Bot 객체 생성"""
+    if PROXY_URL:
+        print(f"🌐 프록시 활성화: {PROXY_URL}")
+        return Bot(token=TELEGRAM_TOKEN, request=HTTPXRequest(proxy_url=PROXY_URL))
+    return Bot(token=TELEGRAM_TOKEN)
+
 def load_monthly_plan(month):
     filename = f"{month:02d}.json"
     file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'plans', filename)
@@ -80,7 +89,7 @@ def format_summary(row, lang_code, date_str):
 async def send_only_summaries(chat_id, kst_now):
     """사용자가 요청한 ID로 3개 국어 요약본만 발송"""
     if not TELEGRAM_TOKEN: return
-    bot = Bot(token=TELEGRAM_TOKEN)
+    bot = _create_bot()
     day_str = str(kst_now.day)
     plan = load_monthly_plan(kst_now.month)
     
@@ -101,7 +110,7 @@ async def broadcast_messages(kst_now):
         print("❌ 설정 오류: TELEGRAM_TOKEN 없음")
         return False
 
-    bot = Bot(token=TELEGRAM_TOKEN)
+    bot = _create_bot()
     current_month = kst_now.month
     day_str = str(kst_now.day)
     
