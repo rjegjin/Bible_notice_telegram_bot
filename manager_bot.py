@@ -3,7 +3,7 @@ Bible Notice Bot — 자체 관리 봇
 TELEGRAM_TOKEN으로 상시 실행, 자기 채팅방 직접 관리.
 - /start, /manage : 인라인 키보드
 - /send, /summary, /run : 직접 트리거
-- 매일 자동 발송 (기존 main.py run 모드 재사용)
+- 매일 자동 발송은 mh_bot systemd timer(bible-daily-send.timer)가 담당
 """
 import asyncio
 import logging
@@ -12,14 +12,13 @@ import subprocess
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".secrets", ".env"))
 
 TOKEN    = os.getenv("TELEGRAM_TOKEN")
 ADMIN_ID = int(os.getenv("ATTENDANCE_TELEGRAM_CHAT_ID", "5929322817"))
-VENV_PY  = "/home/rjegj/projects/unified_venv/bin/python"
+VENV_PY  = os.path.join(os.path.dirname(BASE_DIR), "unified_venv", "bin", "python")
 MAIN_PY  = os.path.join(BASE_DIR, "main.py")
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
@@ -93,22 +92,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def daily_send(app: Application):
-    log.info("일정 발송: send")
-    await asyncio.to_thread(_trigger, "send")
-
-
-async def post_init(app: Application):
-    scheduler = AsyncIOScheduler(timezone="Asia/Seoul")
-    scheduler.add_job(daily_send, "cron", hour=6, minute=0, args=[app], id="bible_daily")
-    scheduler.start()
-    log.info("스케줄러 시작 — 매일 06:00 KST 자동 발송")
-
-
 def main():
     if not TOKEN:
         print("❌ TELEGRAM_TOKEN 없음"); return
-    app = Application.builder().token(TOKEN).post_init(post_init).build()
+    app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start",   cmd_manage))
     app.add_handler(CommandHandler("manage",  cmd_manage))
     app.add_handler(CommandHandler("send",    cmd_send))

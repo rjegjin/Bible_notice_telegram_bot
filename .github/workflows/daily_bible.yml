@@ -1,10 +1,7 @@
 name: Daily Bible Sender
 
 on:
-  schedule:
-    # 한국 시간(KST) 오전 5시는 UTC 기준 전날 20:00입니다.
-    - cron: '31 20 * * *'
-  workflow_dispatch: # 수동으로 실행해볼 수 있는 버튼을 활성화합니다.
+  workflow_dispatch: # 자동 발송은 mh_bot systemd timer가 담당. GitHub Actions는 수동 실행 전용.
 
 jobs:
   build:
