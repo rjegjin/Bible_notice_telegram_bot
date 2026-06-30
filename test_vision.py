@@ -4,10 +4,11 @@ import PIL.Image
 from dotenv import load_dotenv
 from google import genai
 
-load_dotenv('/home/rjegj/projects/.secrets/.env')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(os.path.dirname(BASE_DIR), '.secrets', '.env'))
 client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
 
-img_path = '/home/rjegj/projects/Bible_notice_telegram_bot/assets/2026년_03월_QT_passage.png'
+img_path = os.path.join(BASE_DIR, 'assets', '2026년_03월_QT_passage.png')
 img = PIL.Image.open(img_path)
 
 prompt = "Look at the calendar image for March. What is the text for the passage on the 6th of March? Please return just the passage text."

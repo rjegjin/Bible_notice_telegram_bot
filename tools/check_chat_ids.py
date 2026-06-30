@@ -10,7 +10,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 def load_env_centralized():
-    central_secrets = Path("/home/rjegj/projects/.secrets/.env")
+    central_secrets = Path(BASE_DIR).parent / ".secrets" / ".env"
     if central_secrets.exists():
         load_dotenv(central_secrets)
         return True

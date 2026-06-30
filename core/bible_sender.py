@@ -54,8 +54,8 @@ def _create_bot():
         return Bot(token=TELEGRAM_TOKEN, request=HTTPXRequest(proxy_url=PROXY_URL))
     return Bot(token=TELEGRAM_TOKEN)
 
-def load_monthly_plan(month):
-    filename = f"{month:02d}.json"
+def load_monthly_plan(year, month):
+    filename = f"{int(year):04d}_{int(month):02d}.json"
     file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'plans', filename)
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -91,10 +91,10 @@ async def send_only_summaries(chat_id, kst_now):
     if not TELEGRAM_TOKEN: return
     bot = _create_bot()
     day_str = str(kst_now.day)
-    plan = load_monthly_plan(kst_now.month)
+    plan = load_monthly_plan(kst_now.year, kst_now.month)
     
     if day_str not in plan: 
-        print(f"ℹ️ [요약본] 데이터 없음: {kst_now.month}월 {day_str}일")
+        print(f"ℹ️ [요약본] 데이터 없음: {kst_now.year}년 {kst_now.month}월 {day_str}일")
         return
     row = plan[day_str]
     date_display = kst_now.strftime('%Y/%m/%d')
@@ -111,12 +111,13 @@ async def broadcast_messages(kst_now):
         return False
 
     bot = _create_bot()
+    current_year = kst_now.year
     current_month = kst_now.month
     day_str = str(kst_now.day)
     
-    plan = load_monthly_plan(current_month)
+    plan = load_monthly_plan(current_year, current_month)
     if day_str not in plan:
-        print(f"ℹ️ [단체방] 데이터 없음: {current_month}월 {day_str}일")
+        print(f"ℹ️ [단체방] 데이터 없음: {current_year}년 {current_month}월 {day_str}일")
         return False
 
     row = plan[day_str]

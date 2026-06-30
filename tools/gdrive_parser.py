@@ -9,7 +9,9 @@ from googleapiclient.http import MediaIoBaseDownload
 import PIL.Image
 
 DRIVE_FOLDER_ID = "1VEAWTFsr-LkdiyBtI6Nx2FmEOTFEOvfm"
-SERVICE_KEY_PATH = "/home/rjegj/projects/.secrets/service_key.json"
+SERVICE_KEY_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    ".secrets", "service_key.json")
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
 

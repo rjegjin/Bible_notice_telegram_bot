@@ -12,7 +12,7 @@ sys.path.append(BASE_DIR)
 
 # [보안 & 편의] 중앙 .env 로드 로직 (root/.secrets/.env 우선)
 def load_env_centralized():
-    central_secrets = Path("/home/rjegj/projects/.secrets/.env")
+    central_secrets = Path(BASE_DIR).parent / ".secrets" / ".env"
     if central_secrets.exists():
         load_dotenv(central_secrets)
         return True
@@ -34,7 +34,7 @@ except ImportError as e:
     sys.exit(1)
 
 def check_plan_exists(year, month):
-    plan_path = os.path.join(BASE_DIR, 'data', 'plans', f"{str(month).zfill(2)}.json")
+    plan_path = os.path.join(BASE_DIR, 'data', 'plans', f"{int(year):04d}_{int(month):02d}.json")
     return os.path.exists(plan_path)
 
 async def run_smart_mode(year, month, kst_now):

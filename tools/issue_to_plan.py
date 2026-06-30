@@ -156,7 +156,7 @@ def main():
 
     plans_dir = os.path.join(BASE_DIR, 'data', 'plans')
     os.makedirs(plans_dir, exist_ok=True)
-    output_file = os.path.join(plans_dir, f"{month_str}.json")
+    output_file = os.path.join(plans_dir, f"{year_str}_{month_str}.json")
     
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(sorted_data, f, ensure_ascii=False, indent=4)

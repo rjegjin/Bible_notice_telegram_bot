@@ -8,6 +8,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 
+from tools.hwpx_plan_parser import (
+    find_hwpx_sources,
+    merge_monthly_plan,
+    parse_br_hwpx,
+    parse_qt_hwpx,
+)
+
 # 프로젝트 루트 경로 추가 (core 모듈 임포트용)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -20,7 +27,7 @@ from core.bible_scripture_resolver import BIBLE_MAP
 
 # [보안 & 편의] 중앙 .env 로드 로직 (root/.secrets/.env 우선)
 def load_env_centralized():
-    central_secrets = Path("/home/rjegj/projects/.secrets/.env")
+    central_secrets = Path(BASE_DIR).parent / ".secrets" / ".env"
     if central_secrets.exists():
         load_dotenv(central_secrets)
         return True
@@ -39,10 +46,10 @@ def get_next_month():
     next_month_date = today.replace(day=28) + timedelta(days=4)
     return next_month_date.year, next_month_date.month
 
-def generate_monthly_plan(year, month):
+def _extract_plan_from_images(year, month):
     if not GOOGLE_API_KEY:
         print("❌ 오류: .env 파일에서 GOOGLE_API_KEY를 찾을 수 없습니다.")
-        return
+        return None
 
     year_str = str(year)
     month_str = str(month).zfill(2)
@@ -179,19 +186,65 @@ def generate_monthly_plan(year, month):
             
             sorted_data[day] = row
 
-        plans_dir = os.path.join(BASE_DIR, 'data', 'plans')
-        if not os.path.exists(plans_dir): os.makedirs(plans_dir)
-
-        output_file = os.path.join(plans_dir, f"{month_str}.json")
-        
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(sorted_data, f, ensure_ascii=False, indent=4)
-            
-        print(f"✅ 생성 성공! 저장 위치: data/plans/{month_str}.json (이미지 {len(image_info)}개 반영)")
-        
+        return sorted_data
     except Exception as e:
         print(f"❌ 생성 중 오류 발생: {e}")
-        sys.exit(1)
+        return None
+
+def generate_monthly_plan(year, month):
+    year_str = str(year)
+    month_str = str(month).zfill(2)
+    assets_dir = os.path.join(BASE_DIR, 'assets')
+
+    print(f"\n🔍 [실행] {year_str}년 {month_str}월 데이터 생성 중...")
+
+    hwpx_sources = find_hwpx_sources(assets_dir, year, month)
+    br_path = hwpx_sources.get("BR")
+    qt_path = hwpx_sources.get("QT")
+
+    br_plan = {}
+    qt_plan = {}
+    fallback_plan = None
+
+    if br_path:
+        try:
+            br_plan = parse_br_hwpx(br_path)
+            print(f"  소스: BR HWPX ({os.path.basename(br_path)})")
+        except Exception as e:
+            print(f"⚠️ BR HWPX 파싱 실패: {e}")
+
+    if qt_path:
+        try:
+            qt_plan = parse_qt_hwpx(qt_path)
+            print(f"  소스: QT HWPX ({os.path.basename(qt_path)})")
+        except Exception as e:
+            print(f"⚠️ QT HWPX 파싱 실패: {e}")
+
+    if not br_path or not qt_path or not br_plan or not qt_plan:
+        print("  HWPX가 부족하여 기존 이미지/Gemini 방식으로 보강합니다...")
+        fallback_plan = _extract_plan_from_images(year, month)
+        if fallback_plan is None:
+            print("❌ HWPX 보강에 실패했습니다. 이미지/Gemini fallback도 실패했습니다.")
+            return
+
+    final_plan = merge_monthly_plan(br_plan, qt_plan, fallback_plan)
+    if not final_plan:
+        print("❌ 병합할 데이터를 만들지 못했습니다.")
+        return
+
+    plans_dir = os.path.join(BASE_DIR, 'data', 'plans')
+    if not os.path.exists(plans_dir):
+        os.makedirs(plans_dir)
+
+    output_file = os.path.join(plans_dir, f"{year_str}_{month_str}.json")
+
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(final_plan, f, ensure_ascii=False, indent=4)
+
+    source_label = "HWPX"
+    if fallback_plan:
+        source_label = "HWPX + Gemini fallback"
+    print(f"✅ 생성 성공! 저장 위치: data/plans/{year_str}_{month_str}.json ({source_label})")
 
 if __name__ == "__main__":
     now = datetime.now()
