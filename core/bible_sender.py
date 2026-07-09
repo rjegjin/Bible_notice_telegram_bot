@@ -125,6 +125,7 @@ async def broadcast_messages(kst_now):
 
     print(f"🚀 {kst_now.strftime('%Y-%m-%d')} (KST) 발송 시작...")
 
+    any_success = False
     for chat_id, lang_info in RECIPIENTS.items():
         if not chat_id: continue 
         target_langs = lang_info if isinstance(lang_info, list) else [lang_info]
@@ -156,8 +157,12 @@ async def broadcast_messages(kst_now):
                             await asyncio.sleep(0.3)
 
                 print(f"   ✅ [{lang_code}] 전송 성공 (Chat: {chat_id})")
+                any_success = True
             except Exception as e:
                 print(f"   ❌ [{lang_code}] 전송 실패: {e}")
 
-    print("🏁 전체 발송 완료")
-    return True
+    if any_success:
+        print("🏁 전체 발송 완료")
+    else:
+        print("🏁 전체 발송 실패 (성공한 전송 없음)")
+    return any_success

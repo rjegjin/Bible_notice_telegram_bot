@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 2
     env:
       TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       KO_CHAT_ID: ${{ secrets.KO_CHAT_ID }}
       EN_CHAT_ID: ${{ secrets.EN_CHAT_ID }}
       MN_CHAT_ID: ${{ secrets.MN_CHAT_ID }}

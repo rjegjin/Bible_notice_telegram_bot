@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/home/rjegj/projects/unified_venv/bin/pip show *)",
+      "Bash(/home/rjegj/projects/unified_venv/bin/python -c \"import openai; print\\(openai.__version__\\)\")",
+      "Read(//home/rjegj/projects/.secrets/**)"
+    ]
+  }
+}

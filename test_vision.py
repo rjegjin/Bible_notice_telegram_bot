@@ -1,20 +1,33 @@
+"""Manual smoke test: ask the AI provider a single question about one image."""
+
 import os
 import sys
-import PIL.Image
 from dotenv import load_dotenv
-from google import genai
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
 load_dotenv(os.path.join(os.path.dirname(BASE_DIR), '.secrets', '.env'))
-client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
+
+from ai.provider import get_provider  # noqa: E402
+
+provider = get_provider()
 
 img_path = os.path.join(BASE_DIR, 'assets', '2026년_03월_QT_passage.png')
+
+import PIL.Image  # noqa: E402
 img = PIL.Image.open(img_path)
 
-prompt = "Look at the calendar image for March. What is the text for the passage on the 6th of March? Please return just the passage text."
+prompt = "Look at the calendar image for March. What is the text for the passage on the 6th of March? Please return it as JSON: {\"passage\": \"...\"}."
+schema = {
+    "name": "single_passage",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {"passage": {"type": "string"}},
+        "required": ["passage"],
+        "additionalProperties": False,
+    },
+}
 
-response = client.models.generate_content(
-    model='gemini-2.0-flash', 
-    contents=[img, prompt]
-)
-print("Vision output:", response.text)
+result = provider.generate_from_images([img], prompt, schema)
+print("Vision output:", result["passage"])

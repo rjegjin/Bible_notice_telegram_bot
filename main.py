@@ -3,6 +3,7 @@ import sys
 import argparse
 import asyncio
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -27,7 +28,7 @@ load_env_centralized()
 
 # 신규 구조에 맞춘 임포트
 try:
-    from tools.gemini_parser import generate_monthly_plan
+    from tools.plan_parser import generate_monthly_plan
     from core.bible_sender import broadcast_messages, send_only_summaries
 except ImportError as e:
     print(f"❌ 모듈 임포트 실패: {e}")
@@ -86,14 +87,13 @@ async def start():
         args = parser.parse_args()
     
     # [중요] 모든 작업의 기준이 되는 한국 시간 (KST) 고정
-    from datetime import timedelta
-    kst_now = datetime.utcnow() + timedelta(hours=9)
+    kst_now = datetime.now(ZoneInfo("Asia/Seoul"))
     
     if args.command == "parse":
         if args.year and args.month:
             generate_monthly_plan(args.year, args.month)
         else:
-            from tools.gemini_parser import get_next_month
+            from tools.plan_parser import get_next_month
             nxt_y, nxt_m = get_next_month()
             print(f"📅 연/월 생략됨. 자동으로 다음 달({nxt_y}년 {nxt_m}월) 데이터를 생성합니다.")
             generate_monthly_plan(nxt_y, nxt_m)
