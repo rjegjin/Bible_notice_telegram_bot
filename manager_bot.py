@@ -9,14 +9,13 @@ import asyncio
 import logging
 import os
 import subprocess
-from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from bot_common import load_secrets, require_env, run_bot
 
+load_secrets()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".secrets", ".env"))
-
-TOKEN    = os.getenv("TELEGRAM_TOKEN")
+TOKEN    = require_env("TELEGRAM_TOKEN")
 ADMIN_ID = int(os.getenv("ATTENDANCE_TELEGRAM_CHAT_ID", "5929322817"))
 VENV_PY  = os.path.join(os.path.dirname(BASE_DIR), "unified_venv", "bin", "python")
 MAIN_PY  = os.path.join(BASE_DIR, "main.py")
@@ -93,17 +92,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
-    if not TOKEN:
-        print("❌ TELEGRAM_TOKEN 없음"); return
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start",   cmd_manage))
-    app.add_handler(CommandHandler("manage",  cmd_manage))
-    app.add_handler(CommandHandler("send",    cmd_send))
-    app.add_handler(CommandHandler("summary", cmd_summary))
-    app.add_handler(CommandHandler("run",     cmd_run))
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_menu))
-    app.run_polling(drop_pending_updates=True)
+    handlers = [
+        CommandHandler("start",   cmd_manage),
+        CommandHandler("manage",  cmd_manage),
+        CommandHandler("send",    cmd_send),
+        CommandHandler("summary", cmd_summary),
+        CommandHandler("run",     cmd_run),
+        CallbackQueryHandler(handle_callback),
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_menu),
+    ]
+    run_bot(TOKEN, handlers)
 
 if __name__ == "__main__":
     main()
