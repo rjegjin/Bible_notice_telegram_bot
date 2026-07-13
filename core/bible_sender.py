@@ -2,10 +2,16 @@ import json
 import os
 import asyncio
 import re
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 from telegram import Bot
 from telegram.request import HTTPXRequest
 
+# 프로젝트 루트 추가
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+from common.bot_common import send_telegram
 # [필수] bible_scripture_resolver.py가 같은 폴더에 있어야 합니다.
 from core.bible_scripture_resolver import get_chapter_text, get_qt_text, split_text_for_telegram, translate_citation
 
@@ -89,11 +95,10 @@ def format_summary(row, lang_code, date_str):
 async def send_only_summaries(chat_id, kst_now):
     """사용자가 요청한 ID로 3개 국어 요약본만 발송"""
     if not TELEGRAM_TOKEN: return
-    bot = _create_bot()
     day_str = str(kst_now.day)
     plan = load_monthly_plan(kst_now.year, kst_now.month)
-    
-    if day_str not in plan: 
+
+    if day_str not in plan:
         print(f"ℹ️ [요약본] 데이터 없음: {kst_now.year}년 {kst_now.month}월 {day_str}일")
         return
     row = plan[day_str]
@@ -101,7 +106,7 @@ async def send_only_summaries(chat_id, kst_now):
 
     for lang in ['KO', 'EN', 'MN']:
         msg = format_summary(row, lang, date_display)
-        await bot.send_message(chat_id=chat_id, text=msg)
+        await asyncio.to_thread(send_telegram, msg, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
         await asyncio.sleep(0.5)
     print(f"✅ 개인 대화방({chat_id}) 요약본 발송 완료")
 
@@ -110,11 +115,10 @@ async def broadcast_messages(kst_now):
         print("❌ 설정 오류: TELEGRAM_TOKEN 없음")
         return False
 
-    bot = _create_bot()
     current_year = kst_now.year
     current_month = kst_now.month
     day_str = str(kst_now.day)
-    
+
     plan = load_monthly_plan(current_year, current_month)
     if day_str not in plan:
         print(f"ℹ️ [단체방] 데이터 없음: {current_year}년 {current_month}월 {day_str}일")
@@ -126,25 +130,25 @@ async def broadcast_messages(kst_now):
     print(f"🚀 {kst_now.strftime('%Y-%m-%d')} (KST) 발송 시작...")
 
     for chat_id, lang_info in RECIPIENTS.items():
-        if not chat_id: continue 
+        if not chat_id: continue
         target_langs = lang_info if isinstance(lang_info, list) else [lang_info]
 
         for lang_code in target_langs:
             try:
                 # 1. 요약 메시지 전송
                 summary_msg = format_summary(row, lang_code, kst_now.strftime('%Y/%m/%d'))
-                await bot.send_message(chat_id=chat_id, text=summary_msg)
+                await asyncio.to_thread(send_telegram, summary_msg, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
                 await asyncio.sleep(0.5)
 
                 # 2. 본문 전송 (QT -> 시편 -> 잠언 순)
                 qt_cite = raw_qt
                 if qt_cite and re.match(r"^\d", qt_cite):
                     qt_cite = f"마 {qt_cite}"
-                
+
                 qt_text = get_qt_text(qt_cite, lang_code)
                 if qt_text:
                     for part in split_text_for_telegram(qt_text):
-                        await bot.send_message(chat_id=chat_id, text=part)
+                        await asyncio.to_thread(send_telegram, part, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
                         await asyncio.sleep(0.3)
 
                 for book_abbr, raw_chap in [('시', raw_ps), ('잠', raw_pr)]:
@@ -152,7 +156,7 @@ async def broadcast_messages(kst_now):
                     text = get_chapter_text(book_abbr, raw_chap, lang_code)
                     if text:
                         for part in split_text_for_telegram(text):
-                            await bot.send_message(chat_id=chat_id, text=part)
+                            await asyncio.to_thread(send_telegram, part, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
                             await asyncio.sleep(0.3)
 
                 print(f"   ✅ [{lang_code}] 전송 성공 (Chat: {chat_id})")
