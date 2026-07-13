@@ -1,5 +1,13 @@
 # 📚 Bible_notice_telegram_bot Development Log
 > *Auto-generated from system_core.db at 2026-03-17 23:45:08*
+## [2026-07-13]
+
+- merge: mhbot 운영 변경 수용 + send_telegram 전환 재적용
+- refactor: 능동 알림 전송을 bot_common.send_telegram으로 전환 (notifier transport 계약)
+
+## [2026-07-07]
+
+- chore: docs 최신화 — Gemini 기본값/bot_common 마이그레이션/자동화 현황 반영
 
 ## [2026-07-06] manager_bot.py bot_common 마이그레이션
 - **배경**: 워크스페이스 전역 `bot_common` 헬퍼 모듈(Vocab Bot, Bible Bot, Attendance Bot 통합) 도입.
@@ -9,6 +17,12 @@
   - Telegram 부트스트랩을 `run_bot(TOKEN, handlers)` 한 줄로 단순화
   - `tools/gemini_parser.py` (269줄) 삭제 — `tools/plan_parser.py`로 완전 대체됨
 - **상태**: 실제 발송은 계속 `mh_bot` systemd timer(`bible-daily-send.timer`)가 담당. manager_bot.py는 원격 제어용 웹 UI 역할.
+
+- refactor: 봇 부트스트랩을 공용 bot_common으로 교체
+
+## [2026-07-03]
+
+- feat: 7월 QT/BR plan 추가 (2026_07.json + 원본 이미지)
 
 ## [2026-07-01] Gemini → OpenAI 리팩터링 + Provider 추상화 (CONTEXT DEAD_END)
 - **배경**: 기존 사용 모델(`gemini-2.0-flash`)이 서비스 종료되어 파서가 동작하지 않음. 정확도·유지보수성 우선으로 OpenAI 기반 재작성 요청.
@@ -23,6 +37,28 @@
 - **발송(send) 테스트는 이 세션에서 수행하지 않음**: 매일 자동 발송은 **`mh_bot` systemd timer**(`bible-daily-send.timer`)가 전담 — 본 세션(샌드박스)은 `api.telegram.org` 아웃바운드가 막혀 있어 `python main.py`(전체 run) 실행 시 전송이 아닌 `httpx.ConnectError`만 확인됨. 실제 발송 여부는 `mh_bot` 쪽에서 확인할 것.
 - **버그 수정**: `core/bible_sender.py`의 `broadcast_messages()`가 KO/EN/MN 3개 전송이 전부 실패해도 무조건 `return True`를 반환하여 개인 요약본 발송 단계로 잘못 진입하던 문제 확인 및 수정. `any_success` 플래그로 실제 전송 성공 여부를 추적하도록 변경(`return any_success`).
 - **후속 논의**: Google Drive 이미지 폴더 주소 확인 및 텔레그램 봇을 통한 이미지 업로드 기능 검토(아래 항목 참고).
+
+
+## [2026-06-30]
+
+- fix: 경로 이식성 확보 + plan 신형식(YYYY_MM.json) 통일
+
+## [2026-05-07]
+
+- ops: move bible daily send to mh_bot timer
+- feat:plan05.json added
+
+## [2026-04-01]
+
+- feat: add persistent reply keyboard menu to Bible Notice Bot
+
+## [2026-03-31]
+
+- feat:업데이트 내용 첨가
+- Refactor issue_parser.yml for better commit logic
+- Refactor issue parser to commit only on changes
+- feat: sync issue_to_plan logic with improved gemini_parser and refine workflow
+- feat: enhance gemini_parser logic and generate April 2026 plan
 
 ## [2026-03-17]
 - GitHub Actions 중복 발송 버그 수정 및 플랜 파서 로직 검증
@@ -45,3 +81,95 @@
   ## 2026-02-04
 - Initialized documentation: README.md, GEMINI.md, DEV_LOG.md.
 - Scanned project structure.
+
+- fix: resolve duplicate message sending in GitHub Actions and update project vision
+
+## [2026-03-10]
+
+- fix: Correct March QT parsing data and improve parser prompt
+
+## [2026-03-06]
+
+- fix: correct misread QT passage for March 6th by updating prompt strictness
+- fix: synchronize time calculation to prevent day drift between broadcast and summary
+- fix: ensure AI parses all days for the month instead of stopping early
+- fix: enforce strict null output for Sunday mapping and prevent date shifting
+
+## [2026-03-05]
+
+- fix: enforce strict date mapping to prevent day shifting and missing book names
+- feat: ensure personal summary is sent locally during run command
+- feat: add issue parser pipeline (Plan C) for serverless monthly plan generation
+- chore: remove impractical monthly parser workflow and add summary to daily action
+- fix: make parser prompt flexible to read actual image contents and update March plan
+- fix: update March 2026 Bible reading plan and improve parser logic
+- Add files via upload
+- Delete assets/2026년_03월_BR_passage.png
+
+## [2026-03-02]
+
+- docs: finalize all documentation (README, GEMINI, DEV_LOG) with latest architecture and logic
+- fix: resolve newline characters in personal summaries and officialize summary command
+- fix: restore missing requirements.txt to fix GitHub Actions workflow error
+- docs: update local DEV_LOG.md with architecture and logic enhancements
+- ci: update daily workflow to use smart mode (auto-parse if missing)
+- docs: update README and GEMINI guidelines with new parsing and sending logic
+- fix: correct english bible abbreviations to match database keys
+- fix: implement book inheritance logic for empty book names and enforce QT abbreviations
+- fix: adjust parsing order to NT, OT, Psalms, Proverbs, QT and update MN localization
+- fix: support chapter ranges (e.g., '1-3') in get_chapter_text for Psalms and Proverbs
+- fix: skip sending full text for OT and NT, only send QT, Psalms, and Proverbs
+- feat: add Old Testament (OT) support to parser and sender
+- fix: resolve syntax error in check_chat_ids.py
+- feat: add chat ID checker tool and integrate into main.py
+- fix: update github workflows to match new project structure and main.py commands
+- refactor: complete structural optimization and centralize secrets management
+- chore: update .gitignore to track assets and data, and clean up
+- chore: remove redundant files and clean up project structure
+- refactor: rename core resolver and integrate redundant bible metadata
+- refactor: restructure project directory for better organization
+- feat: add unified main.py and update README.md for better usability
+- docs: specify mandatory file naming conventions in README.md
+- docs: expand README.md with image formats and detailed Chat ID instructions
+- docs: update README.md with detailed user-friendly guide
+- Plan files
+- Create Assets/.gitkeeps
+- Delete GEMINI_windows.md
+
+## [2026-02-26]
+
+- chore: remove ignored files from git index and update .gitignore
+
+## [2026-02-17]
+
+- security: enforce central .env usage and remove local secrets
+
+## [2026-02-04]
+
+- docs: add README, GEMINI integration guide, and dev log
+
+## [2026-02-02]
+
+- feat: implement multilingual support and QT passage retrieval
+- 2
+
+## [2026-02-01]
+
+- feat: Refactor Bible conversion script and update file structure for Mongolian text processing
+
+## [2026-01-17]
+
+- feat: Update Bible database structure and add conversion scripts for Mongolian text
+
+## [2026-01-16]
+
+- feat: Add new scripts for managing Bible database and language integration
+- feat: Add Bible database management scripts and functionality
+
+## [2026-01-15]
+
+- Update cron schedule and add cache for Python dependencies
+- Add GitHub Actions workflow
+- 2
+- First commit: Bible bot complete
+
