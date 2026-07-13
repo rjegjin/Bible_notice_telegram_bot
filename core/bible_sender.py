@@ -49,7 +49,7 @@ translations = {
         'rd_label': "📚 [Библи унших төлөвлөгөө]",
         'ot': "Хуучин Гэрээ", 'nt': "Шинэ Гэрээ", 'ps': "Дуулал", 'pr': "Сургаалт үгс",
         'unit_ps': "-р бүлэг", 'unit_pr': "-р бүлэг", 'none': "Ням гараг (Хувийн уншлага)",
-        'slogan': "Христ шиг байж, Христ шиг болгоцгооё." 
+        'slogan': "Христ шиг байж, Христ шиг болгоцгооё."
     }
 }
 
@@ -72,7 +72,7 @@ def format_summary(row, lang_code, date_str):
     """요약 메시지를 깔끔한 문자열로 포맷팅 (줄바꿈 버그 수정 버전)"""
     lang_pack = translations.get(lang_code, translations['KO'])
     raw_nt, raw_ot, raw_ps, raw_pr, raw_qt = (row + [""] * 5)[:5]
-    
+
     qt_display = translate_citation(raw_qt, lang_code)
     ot_display = translate_citation(raw_ot, lang_code)
     nt_display = translate_citation(raw_nt, lang_code)
@@ -89,7 +89,7 @@ def format_summary(row, lang_code, date_str):
     summary_lines.append(f"▫️ {lang_pack['ps']}: {ps_display}{lang_pack['unit_ps']}")
     summary_lines.append(f"▫️ {lang_pack['pr']}: {pr_display}{lang_pack['unit_pr']}\n")
     summary_lines.append(f"━━━━━━━━━━━━━━━\n\"{lang_pack['slogan']}\"")
-    
+
     return "\n".join(summary_lines)
 
 async def send_only_summaries(chat_id, kst_now):
@@ -129,6 +129,7 @@ async def broadcast_messages(kst_now):
 
     print(f"🚀 {kst_now.strftime('%Y-%m-%d')} (KST) 발송 시작...")
 
+    any_success = False
     for chat_id, lang_info in RECIPIENTS.items():
         if not chat_id: continue
         target_langs = lang_info if isinstance(lang_info, list) else [lang_info]
@@ -160,8 +161,12 @@ async def broadcast_messages(kst_now):
                             await asyncio.sleep(0.3)
 
                 print(f"   ✅ [{lang_code}] 전송 성공 (Chat: {chat_id})")
+                any_success = True
             except Exception as e:
                 print(f"   ❌ [{lang_code}] 전송 실패: {e}")
 
-    print("🏁 전체 발송 완료")
-    return True
+    if any_success:
+        print("🏁 전체 발송 완료")
+    else:
+        print("🏁 전체 발송 실패 (성공한 전송 없음)")
+    return any_success
