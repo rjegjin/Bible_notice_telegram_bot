@@ -140,3 +140,9 @@
 - 증상: `main.py tools/plan_parser.py tools/plan_manager.py`를 remote project root 하나로 전송해 tools 파일 두 개가 루트에 평탄화됐고, 실제 `tools/` 모듈은 이전 버전으로 남았다.
 - 결론: 여러 source를 directory destination으로 보내면 원래 상대 경로가 자동 보존되지 않는다.
 - 다음에는 이렇게: root 파일과 `tools/` 파일을 destination별로 나눠 전송하거나 검증된 `--relative` 방식을 사용하고, 즉시 checksum과 import smoke check를 실행한다.
+
+## 2026-09-18 — 실제 CLI help 확인 없이 운영 smoke check
+
+- 증상: 운영 동기화 확인 중 존재하지 않는 `plan status`를 호출했고, 이어 `prayer preview`에 지원하지 않는 주차 인자를 넘겨 argparse가 종료했다.
+- 결론: 월별 상태 확인은 `plan validate YEAR MONTH`로 하며, 기도제목 preview는 인자 없이 최신 주차를 읽는다.
+- 다음에는 이렇게: 각 중첩 CLI의 `--help`를 먼저 확인하고 실제로 표시된 인자만 사용한다.
