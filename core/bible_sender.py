@@ -35,7 +35,7 @@ translations = {
         'rd_label': "📚 [Bible Reading Plan]",
         'ot': "OT", 'nt': "NT", 'ps': "Psalms", 'pr': "Proverbs",
         'unit_ps': "", 'unit_pr': "", 'none': "Sunday (Personal)",
-        'slogan': "Be Like Christ, Make Like Christ."
+        'slogan': "To Be Like Christ, to Help Others Become Like Christ."
     },
     'MN': {
         'title': "🌟 Өдрийн бясалгал",
