@@ -7,9 +7,11 @@
 
 - chore: DEV_LOG git 히스토리 백필 (타임라인 통합)
 
+
 ## [2026-07-07]
 
 - chore: docs 최신화 — Gemini 기본값/bot_common 마이그레이션/자동화 현황 반영
+
 
 
 ## [2026-07-06] manager_bot.py bot_common 마이그레이션
@@ -24,9 +26,11 @@
 - refactor: 봇 부트스트랩을 공용 bot_common으로 교체
 
 
+
 ## [2026-07-03]
 
 - feat: 7월 QT/BR plan 추가 (2026_07.json + 원본 이미지)
+
 
 
 ## [2026-07-01] Gemini → OpenAI 리팩터링 + Provider 추상화 (CONTEXT DEAD_END)
@@ -45,9 +49,11 @@
 
 
 
+
 ## [2026-06-30]
 
 - fix: 경로 이식성 확보 + plan 신형식(YYYY_MM.json) 통일
+
 
 
 ## [2026-05-07]
@@ -56,9 +62,11 @@
 - feat:plan05.json added
 
 
+
 ## [2026-04-01]
 
 - feat: add persistent reply keyboard menu to Bible Notice Bot
+
 
 
 ## [2026-03-31]
@@ -68,6 +76,7 @@
 - Refactor issue parser to commit only on changes
 - feat: sync issue_to_plan logic with improved gemini_parser and refine workflow
 - feat: enhance gemini_parser logic and generate April 2026 plan
+
 
 
 ## [2026-03-17]
@@ -95,9 +104,11 @@
 - fix: resolve duplicate message sending in GitHub Actions and update project vision
 
 
+
 ## [2026-03-10]
 
 - fix: Correct March QT parsing data and improve parser prompt
+
 
 
 ## [2026-03-06]
@@ -106,6 +117,7 @@
 - fix: synchronize time calculation to prevent day drift between broadcast and summary
 - fix: ensure AI parses all days for the month instead of stopping early
 - fix: enforce strict null output for Sunday mapping and prevent date shifting
+
 
 
 ## [2026-03-05]
@@ -118,6 +130,7 @@
 - fix: update March 2026 Bible reading plan and improve parser logic
 - Add files via upload
 - Delete assets/2026년_03월_BR_passage.png
+
 
 
 ## [2026-03-02]
@@ -151,9 +164,11 @@
 - Delete GEMINI_windows.md
 
 
+
 ## [2026-02-26]
 
 - chore: remove ignored files from git index and update .gitignore
+
 
 
 ## [2026-02-17]
@@ -161,9 +176,11 @@
 - security: enforce central .env usage and remove local secrets
 
 
+
 ## [2026-02-04]
 
 - docs: add README, GEMINI integration guide, and dev log
+
 
 
 ## [2026-02-02]
@@ -172,14 +189,17 @@
 - 2
 
 
+
 ## [2026-02-01]
 
 - feat: Refactor Bible conversion script and update file structure for Mongolian text processing
 
 
+
 ## [2026-01-17]
 
 - feat: Update Bible database structure and add conversion scripts for Mongolian text
+
 
 
 ## [2026-01-16]
@@ -188,12 +208,15 @@
 - feat: Add Bible database management scripts and functionality
 
 
+
 ## [2026-01-15]
 
 - Update cron schedule and add cache for Python dependencies
 - Add GitHub Actions workflow
 - 2
 - First commit: Bible bot complete
+
+
 
 
 

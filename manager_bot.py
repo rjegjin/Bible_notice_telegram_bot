@@ -2,48 +2,95 @@
 Bible Notice Bot — 자체 관리 봇
 TELEGRAM_TOKEN으로 상시 실행, 자기 채팅방 직접 관리.
 - /start, /manage : 인라인 키보드
-- /send, /summary, /run : 직접 트리거
+- /send, /summary, /run, /chatid : 직접 트리거
 - 매일 자동 발송은 mh_bot systemd timer(bible-daily-send.timer)가 담당
 """
 import asyncio
 import logging
 import os
+import re
 import subprocess
+import tempfile
+from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from bot_common import load_secrets, require_env, run_bot
+from core.recipient_config import build_room_send_args, build_trigger_args
 
 load_secrets()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKEN    = require_env("TELEGRAM_TOKEN")
-ADMIN_ID = int(os.getenv("ATTENDANCE_TELEGRAM_CHAT_ID", "5929322817"))
 VENV_PY  = os.path.join(os.path.dirname(BASE_DIR), "unified_venv", "bin", "python")
 MAIN_PY  = os.path.join(BASE_DIR, "main.py")
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
+_PLAN_ALBUMS = {}
 
 
-def _trigger(cmd: str):
+def _parse_plan_captions(caption: str):
+    lines = [line.strip() for line in caption.splitlines() if line.strip()]
+    matches = [re.fullmatch(r"/(qt|br)\s+(\d{4})\s+(\d{1,2})", line, re.IGNORECASE) for line in lines]
+    if not matches or not all(matches):
+        return []
+    return [(match.group(1).upper(), match.group(2), match.group(3)) for match in matches]
+
+
+def _message_media(message):
+    return message.photo[-1] if message.photo else message.document
+
+
+def _album_result_message(commands, outputs):
+    if outputs and "✅ standby 생성:" in outputs[-1]:
+        saved = "\n".join(f"✅ {kind} 저장 완료" for kind, _, _ in commands)
+        return f"{saved}\n✅ standby JSON 생성 및 월 전체 validation 통과\n⏸ 운영 반영 안 됨 · 검토 후 plan publish 필요"
+    return f"❌ standby 생성 실패\n{outputs[-1] if outputs else '처리 결과 없음'}"
+
+
+async def _reply_chunks(message, text, limit=3500):
+    while text:
+        split_at = text.rfind("\n", 0, limit)
+        if split_at < 1:
+            split_at = min(limit, len(text))
+        await message.reply_text(text[:split_at])
+        text = text[split_at:].lstrip("\n")
+
+
+def _trigger(cmd: str, chat_id=None, target=None):
+    if cmd == "send":
+        command_args = build_room_send_args(target or "all")
+    else:
+        command_args = build_trigger_args(cmd, chat_id)
     subprocess.Popen(
-        [VENV_PY, MAIN_PY, cmd],
+        [VENV_PY, MAIN_PY, *command_args],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
-    return f"`{cmd}` 실행 시작됨"
+    if cmd == "send":
+        destination = "설정된 그룹 전문" if target in (None, "all") else f"{target.upper()}방 전문"
+    else:
+        destination = "현재 대화방" if chat_id is not None and cmd in ("summary", "run") else "등록된 수신처"
+    return f"`{cmd}` 실행 시작됨 · 수신처: {destination}"
 
 
 def _menu_inline():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📤 오늘 말씀 발송 (send)",   callback_data="bible:send")],
-        [InlineKeyboardButton("📋 요약만 발송 (summary)",   callback_data="bible:summary")],
-        [InlineKeyboardButton("🔄 스마트 모드 (run)",       callback_data="bible:run")],
+        [
+            InlineKeyboardButton("🇰🇷 KO방 전문", callback_data="bible:send:ko"),
+            InlineKeyboardButton("🇬🇧 EN방 전문", callback_data="bible:send:en"),
+            InlineKeyboardButton("🇲🇳 MN방 전문", callback_data="bible:send:mn"),
+        ],
+        [InlineKeyboardButton("🏠 내 방 요약", callback_data="bible:summary")],
+        [InlineKeyboardButton("📤 그룹 전문 + 내 방 요약", callback_data="bible:send:all")],
+        [InlineKeyboardButton("🔄 그룹 전문 + 이 대화방 요약", callback_data="bible:run")],
     ])
 
 def _menu_reply():
     """하단에 항상 상주하는 메뉴 키보드"""
     return ReplyKeyboardMarkup([
-        ["📤 말씀 발송", "📋 요약만 발송"],
-        ["🔄 스마트 모드"]
+        ["🇰🇷 KO방 전문", "🇬🇧 EN방 전문", "🇲🇳 MN방 전문"],
+        ["🏠 내 방 요약"],
+        ["📤 그룹 전문 + 내 방 요약"],
+        ["🔄 그룹 전문 + 이 대화방 요약"]
     ], resize_keyboard=True)
 
 
@@ -61,30 +108,204 @@ async def cmd_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(await asyncio.to_thread(_trigger, "send"))
 
 async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(await asyncio.to_thread(_trigger, "summary"))
+    await update.message.reply_text(
+        await asyncio.to_thread(_trigger, "summary", update.effective_chat.id)
+    )
 
 async def cmd_run(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(await asyncio.to_thread(_trigger, "run"))
+    await update.message.reply_text(
+        await asyncio.to_thread(_trigger, "run", update.effective_chat.id)
+    )
+
+
+async def cmd_chatid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"`{update.effective_chat.id}`", parse_mode="Markdown")
+
+
+async def cmd_prayer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "주간기도제목 이미지를 사진으로 보내면서 caption에 /prayer 를 입력해주세요. "
+        "OCR 결과가 정확히 13명일 때만 저장됩니다."
+    )
+
+
+async def cmd_plan_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "사진 caption을 `/qt 2026 10` 또는 `/br 2026 10`처럼 입력해주세요. "
+        "두 이미지가 모두 모이면 검증된 standby JSON을 만듭니다.",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_prayerapprove(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    owner_chat_id = os.getenv("BIBLE_OWNER_CHAT_ID") or os.getenv("EN_CHAT_ID")
+    if not owner_chat_id or str(update.effective_chat.id) != str(owner_chat_id):
+        await update.message.reply_text("이 기능은 owner 개인방에서만 사용할 수 있습니다.")
+        return
+    result = await asyncio.to_thread(
+        subprocess.run,
+        [VENV_PY, MAIN_PY, "prayer", "approve"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    output = (result.stdout if result.returncode == 0 else result.stderr).strip()
+    await update.message.reply_text(output or "기도제목 승인 결과가 없습니다.")
+
+
+async def cmd_prayerpreview(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    owner_chat_id = os.getenv("BIBLE_OWNER_CHAT_ID") or os.getenv("EN_CHAT_ID")
+    if not owner_chat_id or str(update.effective_chat.id) != str(owner_chat_id):
+        await update.message.reply_text("이 기능은 owner 개인방에서만 사용할 수 있습니다.")
+        return
+    result = await asyncio.to_thread(
+        subprocess.run,
+        [VENV_PY, MAIN_PY, "prayer", "preview"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    output = (result.stdout if result.returncode == 0 else result.stderr).strip()
+    await _reply_chunks(update.message, output or "기도제목 검토 결과가 없습니다.")
+
+
+async def _run_plan_photo(photo, kind, year, month):
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temporary:
+        image_path = Path(temporary.name)
+    try:
+        telegram_file = await photo.get_file()
+        await telegram_file.download_to_drive(image_path)
+        result = await asyncio.to_thread(
+            subprocess.run,
+            [VENV_PY, MAIN_PY, "plan", "stage-image", year, month, kind, str(image_path)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "stage-image 실행 실패")
+        return result.stdout.strip()
+    finally:
+        image_path.unlink(missing_ok=True)
+
+
+async def _finish_plan_album(media_group_id):
+    await asyncio.sleep(1)
+    album = _PLAN_ALBUMS.pop(media_group_id, None)
+    if not album:
+        return
+    message = album["message"]
+    photos = [photo for _, photo in sorted(album["photos"])]
+    commands = album["commands"]
+    if len(photos) != len(commands):
+        await message.reply_text(f"❌ 앨범 사진 {len(photos)}장과 caption 명령 {len(commands)}개의 수가 다릅니다.")
+        return
+    if len({(year, month) for _, year, month in commands}) != 1 or {kind for kind, _, _ in commands} != {"BR", "QT"}:
+        await message.reply_text("❌ 한 앨범에는 같은 연월의 /br과 /qt를 하나씩 입력해주세요.")
+        return
+    try:
+        outputs = []
+        for photo, (kind, year, month) in zip(photos, commands):
+            if not 1 <= int(month) <= 12:
+                raise ValueError("월은 1~12로 입력해주세요.")
+            outputs.append(await _run_plan_photo(photo, kind, year, month))
+        await message.reply_text(_album_result_message(commands, outputs)[-3500:])
+    except subprocess.TimeoutExpired:
+        await message.reply_text("❌ 이미지 분석 시간이 초과되었습니다. 다시 시도해주세요.")
+    except Exception as error:
+        await message.reply_text(f"❌ 이미지 처리 실패: {error}")
+
+
+async def handle_prayer_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    caption = (update.message.caption or "").strip()
+    plan_commands = _parse_plan_captions(caption)
+    media_group_id = update.message.media_group_id
+    if caption != "/prayer" and not plan_commands and media_group_id not in _PLAN_ALBUMS:
+        return
+    owner_chat_id = os.getenv("BIBLE_OWNER_CHAT_ID") or os.getenv("EN_CHAT_ID")
+    if not owner_chat_id or str(update.effective_chat.id) != str(owner_chat_id):
+        await update.message.reply_text("이 기능은 owner 개인방에서만 사용할 수 있습니다.")
+        return
+
+    if media_group_id and (plan_commands or media_group_id in _PLAN_ALBUMS):
+        album = _PLAN_ALBUMS.setdefault(
+            media_group_id,
+            {"photos": [], "commands": [], "message": update.message, "scheduled": False},
+        )
+        album["photos"].append((update.message.message_id, _message_media(update.message)))
+        if plan_commands:
+            album["commands"] = plan_commands
+            album["message"] = update.message
+        if not album["scheduled"]:
+            album["scheduled"] = True
+            context.application.create_task(_finish_plan_album(media_group_id), update=update)
+        return
+
+    if plan_commands:
+        kind, year, month = plan_commands[0]
+        if not 1 <= int(month) <= 12:
+            await update.message.reply_text("월은 1~12로 입력해주세요.")
+            return
+        await update.message.reply_text(f"🔍 {year}년 {int(month)}월 {kind} 이미지를 처리하고 있습니다...")
+        try:
+            output = await _run_plan_photo(_message_media(update.message), kind, year, month)
+            await update.message.reply_text(output[-3500:] or "이미지 처리 결과가 없습니다.")
+        except subprocess.TimeoutExpired:
+            await update.message.reply_text("❌ 이미지 분석 시간이 초과되었습니다. 다시 시도해주세요.")
+        return
+    else:
+        await update.message.reply_text("🔍 주간기도제목 13명을 추출하고 있습니다...")
+        command = [VENV_PY, MAIN_PY, "prayer", "import"]
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temporary:
+        image_path = Path(temporary.name)
+    try:
+        telegram_file = await _message_media(update.message).get_file()
+        await telegram_file.download_to_drive(image_path)
+        result = await asyncio.to_thread(
+            subprocess.run,
+            [*command, str(image_path), "--replace"],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        output = (result.stdout if result.returncode == 0 else result.stderr).strip()
+        await _reply_chunks(update.message, output or "기도제목 처리 결과가 없습니다.")
+    except subprocess.TimeoutExpired:
+        await update.message.reply_text("❌ 이미지 분석 시간이 초과되었습니다. 다시 시도해주세요.")
+    finally:
+        image_path.unlink(missing_ok=True)
+
 
 async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """하단 상주 메뉴 버튼 클릭 처리"""
     text = update.message.text
 
-    if text == "📤 말씀 발송":
-        msg = await asyncio.to_thread(_trigger, "send")
+    if text == "📤 그룹 전문 + 내 방 요약":
+        msg = await asyncio.to_thread(_trigger, "send", None, "all")
         await update.message.reply_text(f"📖 *Bible Notice Bot*\n{msg}", parse_mode="Markdown")
-    elif text == "📋 요약만 발송":
-        msg = await asyncio.to_thread(_trigger, "summary")
+    elif text in {"🇰🇷 KO방 전문", "🇬🇧 EN방 전문", "🇲🇳 MN방 전문"}:
+        target = {
+            "🇰🇷 KO방 전문": "ko",
+            "🇬🇧 EN방 전문": "en",
+            "🇲🇳 MN방 전문": "mn",
+        }[text]
+        msg = await asyncio.to_thread(_trigger, "send", None, target)
         await update.message.reply_text(f"📖 *Bible Notice Bot*\n{msg}", parse_mode="Markdown")
-    elif text == "🔄 스마트 모드":
-        msg = await asyncio.to_thread(_trigger, "run")
+    elif text == "🏠 내 방 요약":
+        msg = await asyncio.to_thread(_trigger, "summary", update.effective_chat.id)
+        await update.message.reply_text(f"📖 *Bible Notice Bot*\n{msg}", parse_mode="Markdown")
+    elif text == "🔄 그룹 전문 + 이 대화방 요약":
+        msg = await asyncio.to_thread(_trigger, "run", update.effective_chat.id)
         await update.message.reply_text(f"📖 *Bible Notice Bot*\n{msg}", parse_mode="Markdown")
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    cmd = query.data.split(":")[-1]
-    msg = await asyncio.to_thread(_trigger, cmd)
+    parts = query.data.split(":")
+    cmd = parts[1]
+    target = parts[2] if len(parts) > 2 else None
+    chat_id = update.effective_chat.id if cmd in ("summary", "run") else None
+    msg = await asyncio.to_thread(_trigger, cmd, chat_id, target)
     await query.edit_message_text(
         f"📖 *Bible Notice Bot*\n{msg}",
         parse_mode="Markdown", reply_markup=_menu_inline()
@@ -98,7 +319,14 @@ def main():
         CommandHandler("send",    cmd_send),
         CommandHandler("summary", cmd_summary),
         CommandHandler("run",     cmd_run),
+        CommandHandler("chatid",  cmd_chatid),
+        CommandHandler("prayer",  cmd_prayer),
+        CommandHandler("qt", cmd_plan_image),
+        CommandHandler("br", cmd_plan_image),
+        CommandHandler("prayerapprove", cmd_prayerapprove),
+        CommandHandler("prayerpreview", cmd_prayerpreview),
         CallbackQueryHandler(handle_callback),
+        MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_prayer_image),
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_menu),
     ]
     run_bot(TOKEN, handlers)

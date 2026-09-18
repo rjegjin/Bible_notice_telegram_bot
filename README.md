@@ -33,8 +33,10 @@ pip install -r requirements.txt
 # 필수
 TELEGRAM_TOKEN="..."
 KO_CHAT_ID="..."
-EN_CHAT_ID="..."
+EN_CHAT_ID="..."          # owner 개인방 호환값
+EN_GROUP_CHAT_ID="..."    # 별도 영어 그룹방
 MN_CHAT_ID="..."
+BIBLE_OWNER_CHAT_ID="..."   # 개인 3개 국어 요약 수신처
 
 # AI 공급자 선택 (기본값: gemini = Google Gemini 무료 티어)
 AI_PROVIDER="gemini"          # 또는 "openai"
@@ -57,8 +59,17 @@ python main.py
 # 메시지만 즉시 발송하고 싶을 때
 python main.py send
 
+# 방 하나만 선택 발송
+python main.py send --target ko  # ko / en / mn / owner / all
+
+# all: KO/MN 그룹에는 전문, owner 개인방에는 3개 국어 요약만 발송
+python main.py send --target all
+
 # 개인 대화방으로 3개 국어 요약본(진도표)만 보내고 싶을 때
 python main.py summary
+
+# 특정 대화방으로 명시해서 보내기 (관리봇은 현재 대화방 ID를 자동 전달)
+python main.py summary --chat-id "..."
 
 # 최근 메시지를 통해 새로운 채팅방 ID를 확인하고 싶을 때
 python main.py check
@@ -66,6 +77,121 @@ python main.py check
 # 특정 달의 데이터를 강제로 새로 생성하고 싶을 때
 python main.py parse 2026 3
 ```
+
+### 4. 월별 말씀 plan 관리 UI
+
+```bash
+# 대화형 관리 메뉴
+python main.py plan
+
+# 보유 월 목록 / 조회 / 검증
+python main.py plan list
+python main.py plan show 2026 7
+python main.py plan show 2026 7 --day 15
+python main.py plan validate 2026 7
+
+# 특정 날짜 수정: diff 확인 후 --yes가 있어야 비대화식 저장
+python main.py plan edit 2026 7 15 --qt "요 5:1-18" --yes
+
+# Telegram 발송 없는 요약 미리보기
+python main.py plan preview 2026 7 15 --lang ALL
+
+# [권장] asset 재파싱 → JSON 교체 → mh_bot 배포 → owner Telegram test
+python main.py plan publish 2026 7
+
+# 임의 파일명의 이미지를 표준 asset 이름으로 가져오기
+python main.py plan import-images 2026 8 \
+  --br ~/Downloads/br.jpg \
+  --qt ~/Downloads/qt.jpg
+
+# 주간기도제목 이미지 OCR: 13명을 월 3명, 화~토 2명씩 저장
+python main.py prayer import ~/Downloads/주간기도제목.jpg
+
+# 오늘 배정 미리보기 / 발송
+python main.py prayer approve
+python main.py prayer send --dry-run
+python main.py prayer send
+
+# 기존 파일 backup 후 OCR 재생성
+python main.py plan reparse 2026 7
+
+# 이미 생성된 JSON만 검증 후 운영 mh_bot에 재반영
+python main.py plan deploy 2026 7
+
+# HWPX parsing은 기본 OFF. 필요할 때만 명시적으로 toggle
+python main.py parse --hwpx-status
+python main.py parse --enable-hwpx
+python main.py parse --disable-hwpx
+```
+
+수정 저장은 `data/plans/backups/`에 원본을 보관한 뒤 atomic replace로 처리합니다.
+검증에 실패하면 원본 JSON을 변경하지 않습니다. `deploy`는 로컬 검증과 원격
+검증을 모두 통과해야 완료됩니다. asset 자체가 바뀐 경우에는 `deploy`가 아니라
+`publish`를 사용해야 하며, publish 실패 시 backup을 복원하고 배포와 Telegram
+test를 중단합니다.
+
+`assets/`에 이미지를 복사하는 것만으로 JSON 생성이나 운영 배포가 자동 실행되지는
+않습니다. `import-images`는 이미지 유효성을 확인하고
+`YYYY년_MM월_BR_passage`/`QT_passage` 이름으로 정리하며, 기존 파일 교체에는
+`--replace`가 필요합니다. 가져온 뒤 `publish`를 실행해야 JSON 생성·운영 배포·
+Telegram test가 완료됩니다. 운영 06:00 timer는 `send`만 실행하므로 월말에 미리
+`publish`하는 방식을 권장합니다.
+
+### Quiet Time 월별 Google Docs 탭
+
+`plan publish YEAR MONTH`는 OCR/월 검증 후 기존 Google Doc
+`1v4qG2b2jKL8j2JUhqCIWJbNTSctCnp10vQo4y7rUv3s`의 `M월` 탭을 생성/갱신합니다.
+문서 새 파일은 만들지 않습니다. 제목은 `YYYY년 M월 Quiet Time 적용 시트`입니다.
+
+```text
+BR/QT asset → publish → OCR → 월 검증 → 월 탭 생성/갱신 → Docs readback → 배포 → owner test
+                         실패: JSON 복원    실패/충돌: 배포 중단
+```
+
+```bash
+python main.py plan sheet 2026 10                 # 기존 검증된 JSON으로 Docs만 갱신
+python main.py plan publish 2026 10 --yes          # 전체 흐름
+python main.py plan publish 2026 10 --yes --no-sheet  # 긴급 Docs 생략
+```
+
+- 기존 service account의 Cloud project에서 Google Docs API를 활성화하고, 대상 문서를
+  해당 계정에 **편집자**로 공유해야 합니다. 키를 변경하거나 코드에 넣지 않습니다.
+- 설치: unified environment에서 `pip install -r requirements.txt`.
+- 1~15일/16~말일의 7열 표, 148×203mm, section break와 양면 여백을 적용합니다.
+- 같은 월 갱신 시 사용자의 중심구절·제목·적용·체크 텍스트는 보존합니다.
+  다른 연도나 예상과 다른 기존 표 구조는 덮어쓰지 않고 중단합니다.
+- 모든 쓰기는 대상 `tabId`와 직전 revision을 명시합니다. 날짜·요일·전체 QT 본문을
+  readback 검증하며, 실패 후에도 검증된 로컬 JSON과 기존 backup은 남습니다.
+  Docs는 여러 batch이므로 일부 변경이 남을 수 있습니다. 동일 월 재실행으로 재개합니다.
+- 공휴일은 `holidays`의 KR PUBLIC 달력(음력·대체공휴일 포함)을 사용합니다.
+  새 임시공휴일 발표 시 패키지를 갱신해야 합니다.
+- 최초 실문서 실행 후 PDF로 정확한 2쪽 배치와 여백을 확인해야 합니다.
+  API 구조 검증만으로 인쇄 페이지 수를 보장하지 않습니다.
+
+주간기도제목은 owner 개인방에서 사진 caption을 `/prayer`로 보내도 가져올 수 있습니다.
+OCR 결과가 정확히 13명일 때만 저장되며, 요일별 이름을 검토하고 `/prayerapprove`로
+승인해야 합니다. 승인 뒤 기존 일일 `run`/`send --target all` 실행이 매일 06:00 KST에
+월요일 3명, 화~토요일 2명을 `PRAYER_CHAT_ID`(없으면 MydailyBibleBot owner 개인방)로 한 사람당
+한 메시지씩 보냅니다. 사람별 발송 marker를 남겨 같은 날 재실행해도 중복 발송하지
+않습니다.
+
+월별 QT/BR 사진은 owner 개인방에서 각각 `/qt 2026 10`, `/br 2026 10`처럼
+caption을 붙여 보냅니다. 한 장만 도착하면 상대 이미지를 기다리고, 두 장이 모두
+모이면 OCR과 월 전체 검증 후 `data/plans/standby/2026_10.json`에 저장합니다.
+standby 파일은 자동 발송·Docs 갱신·운영 배포에 사용되지 않으며, 검토 후 기존
+`plan publish`로 **같은 JSON을 재OCR 없이** 승격합니다. standby가 없을 때만
+기존 이미지 OCR 경로를 사용합니다.
+
+주간기도 원본은 `data/prayers/sources/`에 주차별로 보존됩니다. OCR 직후 전체
+기도문 미리보기가 owner 방에 분할 전송되며 `/prayerpreview`로 다시 확인할 수
+있습니다. `/prayerapprove`는 `future_only` 정책으로 승인하여 이미 지난 날짜를
+자동 보충 발송하지 않습니다.
+
+2026년 2학기 OAT는 `data/prayers/2026_H2_oat.json`에서 관리합니다. 2026-09-07부터
+같은 06:00 KST 실행에서 요일별 담당자에게 매주 다음 기도제목 1개를 별도 메시지로
+보냅니다. 수요일에는 `정석훈 → 심창민 → 이준우` 순서이며, OAT 전용 marker로
+중복을 막습니다. `python main.py prayer oat-send --date YYYY-MM-DD --dry-run`으로
+해당 날짜를 미리 볼 수 있습니다.
 
 ---
 
@@ -78,7 +204,7 @@ python main.py parse 2026 3
     *   `provider.py`: `get_provider()` 팩토리 (환경변수 `AI_PROVIDER`로 교체 가능, 기본값 `openai`)
 *   `core/`: 핵심 비즈니스 로직 (성경 해석 및 텔레그램 발송)
 *   `data/`: 데이터 저장소 (SQLite 성경 DB 및 날짜별 계획 JSON)
-*   `tools/`: AI 파서 및 관리용 유틸리티 (`plan_parser.py`가 이미지 → JSON 변환 담당)
+*   `tools/`: AI 파서 및 관리용 유틸리티 (`plan_parser.py`: 이미지 → JSON, `plan_manager.py`: 조회·수정·검증·배포)
 *   `assets/`: 성경 읽기표/QT 이미지 보관함 (형식: `{연도}년_{월}월_{구분}_passage`)
 
 ---

@@ -51,15 +51,14 @@ META_INFO = {
 
 def translate_citation(text, lang_code):
     """한글 약어(예: 마1-4)를 타 언어(Matt 1-4)로 변환 (표시용)"""
-    if lang_code == 'KO' or not text: return text
-    match = re.match(r"([가-힣]+)\s*(.*)", text)
-    if match:
-        book_ko = match.group(1)
-        rest = match.group(2)
-        if book_ko in BIBLE_MAP:
-            book_trans = BIBLE_MAP[book_ko].get(lang_code, book_ko)
-            return f"{book_trans} {rest}".strip()
-    return text
+    if lang_code == 'KO' or not text:
+        return text
+    books = "|".join(sorted(map(re.escape, BIBLE_MAP), key=len, reverse=True))
+    return re.sub(
+        rf"(?<![가-힣])({books})\s*(?=\d)",
+        lambda match: BIBLE_MAP[match.group(1)].get(lang_code, match.group(1)) + " ",
+        text,
+    ).strip()
 
 def get_chapter_text(book_abbrev, chapter_str, lang_code='KO'):
     """(기존 기능) 시편/잠언처럼 '장' 전체를 가져올 때 사용. '시 1-3' 같은 범위도 지원."""

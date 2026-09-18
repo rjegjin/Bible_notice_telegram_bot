@@ -19,3 +19,7 @@ Thumbs.db
 !assets/*.jpg
 !assets/*.jpeg
 !assets/*.webp
+data/plans/backups/
+data/plans/standby/
+# 개인 기도문·원본 이미지·발송 marker는 운영 데이터이며 Git에 올리지 않는다.
+data/prayers/

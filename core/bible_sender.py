@@ -14,16 +14,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.bot_common import send_telegram
 # [필수] bible_scripture_resolver.py가 같은 폴더에 있어야 합니다.
 from core.bible_scripture_resolver import get_chapter_text, get_qt_text, split_text_for_telegram, translate_citation
+from core.recipient_config import resolve_broadcast_recipients, resolve_owner_recipient
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 PROXY_URL = os.getenv('TELEGRAM_PROXY_URL')  # socks5://localhost:1080 등
-
-# --- 수신처 설정 ---
-RECIPIENTS = {
-    os.getenv('KO_CHAT_ID'): 'KO',
-    os.getenv('EN_CHAT_ID'): 'EN',
-    os.getenv('MN_CHAT_ID'): 'MN',
-}
 
 # --- 언어별 메시지 템플릿 ---
 translations = {
@@ -87,7 +81,9 @@ def format_summary(row, lang_code, date_str):
     summary_lines.append(f"▫️ {lang_pack['nt']}: {nt_display if raw_nt else lang_pack['none']}")
     summary_lines.append(f"▫️ {lang_pack['ot']}: {ot_display if raw_ot else lang_pack['none']}")
     summary_lines.append(f"▫️ {lang_pack['ps']}: {ps_display}{lang_pack['unit_ps']}")
-    summary_lines.append(f"▫️ {lang_pack['pr']}: {pr_display}{lang_pack['unit_pr']}\n")
+    if raw_pr:
+        summary_lines.append(f"▫️ {lang_pack['pr']}: {pr_display}{lang_pack['unit_pr']}")
+    summary_lines.append("")
     summary_lines.append(f"━━━━━━━━━━━━━━━\n\"{lang_pack['slogan']}\"")
 
     return "\n".join(summary_lines)
@@ -110,7 +106,7 @@ async def send_only_summaries(chat_id, kst_now):
         await asyncio.sleep(0.5)
     print(f"✅ 개인 대화방({chat_id}) 요약본 발송 완료")
 
-async def broadcast_messages(kst_now):
+async def broadcast_messages(kst_now, target="all"):
     if not TELEGRAM_TOKEN:
         print("❌ 설정 오류: TELEGRAM_TOKEN 없음")
         return False
@@ -127,46 +123,65 @@ async def broadcast_messages(kst_now):
     row = plan[day_str]
     raw_nt, raw_ot, raw_ps, raw_pr, raw_qt = (row + [""] * 5)[:5]
 
-    print(f"🚀 {kst_now.strftime('%Y-%m-%d')} (KST) 발송 시작...")
+    try:
+        recipients = resolve_broadcast_recipients(target)
+    except (RuntimeError, ValueError) as e:
+        print(f"❌ 수신처 설정 오류: {e}")
+        return False
+
+    print(f"🚀 {kst_now.strftime('%Y-%m-%d')} (KST) 발송 시작 · 대상: {target}...")
 
     any_success = False
-    for chat_id, lang_info in RECIPIENTS.items():
-        if not chat_id: continue
-        target_langs = lang_info if isinstance(lang_info, list) else [lang_info]
+    for room_key, chat_id, lang_code in recipients:
+        try:
+            # 1. 요약 메시지 전송
+            summary_msg = format_summary(row, lang_code, kst_now.strftime('%Y/%m/%d'))
+            await asyncio.to_thread(send_telegram, summary_msg, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
+            await asyncio.sleep(0.5)
 
-        for lang_code in target_langs:
-            try:
-                # 1. 요약 메시지 전송
-                summary_msg = format_summary(row, lang_code, kst_now.strftime('%Y/%m/%d'))
-                await asyncio.to_thread(send_telegram, summary_msg, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
-                await asyncio.sleep(0.5)
+            # 2. 본문 전송 (QT -> 시편 -> 잠언 순)
+            qt_cite = raw_qt
+            if qt_cite and re.match(r"^\d", qt_cite):
+                qt_cite = f"마 {qt_cite}"
 
-                # 2. 본문 전송 (QT -> 시편 -> 잠언 순)
-                qt_cite = raw_qt
-                if qt_cite and re.match(r"^\d", qt_cite):
-                    qt_cite = f"마 {qt_cite}"
+            qt_text = get_qt_text(qt_cite, lang_code)
+            if qt_text:
+                for part in split_text_for_telegram(qt_text):
+                    await asyncio.to_thread(send_telegram, part, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
+                    await asyncio.sleep(0.3)
 
-                qt_text = get_qt_text(qt_cite, lang_code)
-                if qt_text:
-                    for part in split_text_for_telegram(qt_text):
+            for book_abbr, raw_chap in [('시', raw_ps), ('잠', raw_pr)]:
+                if not raw_chap:
+                    continue
+                if ":" in raw_chap:
+                    text = get_qt_text(raw_chap, lang_code)
+                else:
+                    text = get_chapter_text(book_abbr, raw_chap, lang_code)
+                if text:
+                    for part in split_text_for_telegram(text):
                         await asyncio.to_thread(send_telegram, part, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
                         await asyncio.sleep(0.3)
 
-                for book_abbr, raw_chap in [('시', raw_ps), ('잠', raw_pr)]:
-                    if not raw_chap: continue
-                    text = get_chapter_text(book_abbr, raw_chap, lang_code)
-                    if text:
-                        for part in split_text_for_telegram(text):
-                            await asyncio.to_thread(send_telegram, part, token=TELEGRAM_TOKEN, chat_id=chat_id, parse_mode=None)
-                            await asyncio.sleep(0.3)
-
-                print(f"   ✅ [{lang_code}] 전송 성공 (Chat: {chat_id})")
-                any_success = True
-            except Exception as e:
-                print(f"   ❌ [{lang_code}] 전송 실패: {e}")
+            print(f"   ✅ [{room_key.upper()}방/{lang_code}] 전송 성공")
+            any_success = True
+        except Exception as e:
+            print(f"   ❌ [{room_key.upper()}방/{lang_code}] 전송 실패: {e}")
 
     if any_success:
         print("🏁 전체 발송 완료")
     else:
         print("🏁 전체 발송 실패 (성공한 전송 없음)")
     return any_success
+
+
+async def deliver_daily(kst_now, owner_chat_id=None):
+    """KO/MN 그룹에는 전문을, owner 개인방에는 요약만 발송한다."""
+    groups_success = await broadcast_messages(kst_now, target="all")
+    if not groups_success:
+        print("⚠️ 그룹 전문 발송 실패로 owner 요약을 보내지 않습니다.")
+        return False
+
+    recipient, source = resolve_owner_recipient(owner_chat_id)
+    print(f"💌 MydailyBibleBot owner 요약 수신처: {source}")
+    await send_only_summaries(recipient, kst_now)
+    return True
