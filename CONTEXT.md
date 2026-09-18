@@ -1,5 +1,11 @@
 # CONTEXT — Bible Notice Telegram Bot
 
+## 2026-09-18 — OAT 요일별 수동 재호출
+
+- [완료] owner 개인방 `/oatday 월|화|수|목|금|토`와 `/manage` OAT 월~토 버튼으로 이번 주 OAT 기도를 재호출한다.
+- [안전] 기존 OAT `.sent` marker를 지우지 않고 수동 `--force` 호출에서만 우회한다.
+- [확인] OAT 이미지 OCR 추출 기능은 없으며, 현재는 `data/prayers/2026_H2_oat.json`을 읽어 발송한다.
+
 ## 2026-09-18 — 날짜별 말씀·요일별 기도 수동 재호출
 
 - [완료] Telegram `/send [YYYY-MM-DD] [all|ko|en|mn|owner]`로 오늘 또는 지정 날짜 말씀을 다시 보낸다.

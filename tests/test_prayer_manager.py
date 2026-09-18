@@ -230,14 +230,22 @@ class PrayerManagerTests(unittest.TestCase):
             repeated = send_oat_for_date(
                 oat, date(2026, 9, 7), token="token", chat_id="chat", state_dir=state_dir
             )
+            forced = send_oat_for_date(
+                oat,
+                date(2026, 9, 7),
+                token="token",
+                chat_id="chat",
+                state_dir=state_dir,
+                force=True,
+            )
             next_week = send_oat_for_date(
                 oat, date(2026, 9, 14), token="token", chat_id="chat", state_dir=state_dir
             )
 
-        self.assertEqual((sent, repeated, next_week), (3, 0, 3))
-        self.assertEqual(send.call_count, 6)
-        self.assertIn("기도 2/2", send.call_args_list[3].args[0])
-        self.assertIn("둘째 기도", send.call_args_list[3].args[0])
+        self.assertEqual((sent, repeated, forced, next_week), (3, 0, 3, 3))
+        self.assertEqual(send.call_count, 9)
+        self.assertIn("기도 2/2", send.call_args_list[6].args[0])
+        self.assertIn("둘째 기도", send.call_args_list[6].args[0])
 
 
 if __name__ == "__main__":

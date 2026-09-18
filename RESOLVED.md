@@ -5,6 +5,12 @@
 
 ---
 
+## 2026-09-18 — OAT 기도 Telegram 요일별 재호출
+
+- 내용: `/oatday` 명령과 `/manage` OAT 월~토 버튼, OAT `--force --chat-id` 발송을 추가했다.
+- 결과: owner 개인방에서 이번 주 특정 요일 OAT 기도를 다시 받을 수 있고 자동발송 marker는 보존된다.
+- 파일: `manager_bot.py`, `tools/prayer_manager.py`, `tests/test_prayer_manager.py`
+
 ## 2026-09-18 — 날짜별 말씀·요일별 기도 Telegram 재호출
 
 - 내용: `/send` 날짜 인자와 `/prayerday` 요일 명령, `/manage` 오늘 말씀·월~토 기도 버튼을 추가했다.

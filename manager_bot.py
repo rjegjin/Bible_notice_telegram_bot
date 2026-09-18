@@ -115,6 +115,10 @@ def _menu_inline():
             InlineKeyboardButton(f"🙏 {day}", callback_data=f"bible:prayer:{index}")
             for index, day in enumerate(_PRAYER_DAYS)
         ],
+        [
+            InlineKeyboardButton(f"OAT {day}", callback_data=f"bible:oat:{index}")
+            for index, day in enumerate(_PRAYER_DAYS)
+        ],
     ])
 
 def _menu_reply():
@@ -151,7 +155,7 @@ async def cmd_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"`{' '.join(command)}` 실행 시작됨", parse_mode="Markdown")
 
 
-async def _send_prayer_day(message, chat_id, value):
+async def _send_prayer_day(message, chat_id, value, *, oat=False):
     owner_chat_id = os.getenv("BIBLE_OWNER_CHAT_ID") or os.getenv("EN_CHAT_ID")
     if not owner_chat_id or str(chat_id) != str(owner_chat_id):
         await message.reply_text("이 기능은 owner 개인방에서만 사용할 수 있습니다.")
@@ -164,7 +168,8 @@ async def _send_prayer_day(message, chat_id, value):
     result = await asyncio.to_thread(
         subprocess.run,
         [
-            VENV_PY, MAIN_PY, "prayer", "send", "--date", day.isoformat(),
+            VENV_PY, MAIN_PY, "prayer", "oat-send" if oat else "send",
+            "--date", day.isoformat(),
             "--force", "--chat-id", str(chat_id),
         ],
         capture_output=True,
@@ -180,6 +185,18 @@ async def cmd_prayerday(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("사용법: /prayerday 월|화|수|목|금|토")
         return
     await _send_prayer_day(update.message, update.effective_chat.id, context.args[0])
+
+
+async def cmd_oatday(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) != 1:
+        await update.message.reply_text("사용법: /oatday 월|화|수|목|금|토")
+        return
+    await _send_prayer_day(
+        update.message,
+        update.effective_chat.id,
+        context.args[0],
+        oat=True,
+    )
 
 async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -395,6 +412,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         day_name = tuple(_PRAYER_DAYS)[int(parts[2])]
         await _send_prayer_day(query.message, update.effective_chat.id, day_name)
         return
+    if cmd == "oat":
+        day_name = tuple(_PRAYER_DAYS)[int(parts[2])]
+        await _send_prayer_day(
+            query.message,
+            update.effective_chat.id,
+            day_name,
+            oat=True,
+        )
+        return
     target = parts[2] if len(parts) > 2 else None
     chat_id = update.effective_chat.id if cmd in ("summary", "run") else None
     msg = await asyncio.to_thread(_trigger, cmd, chat_id, target)
@@ -418,6 +444,7 @@ def main():
         CommandHandler("prayerapprove", cmd_prayerapprove),
         CommandHandler("prayerpreview", cmd_prayerpreview),
         CommandHandler("prayerday", cmd_prayerday),
+        CommandHandler("oatday", cmd_oatday),
         CallbackQueryHandler(handle_callback),
         MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_prayer_image),
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_menu),

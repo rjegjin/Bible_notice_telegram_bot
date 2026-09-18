@@ -339,6 +339,7 @@ def send_oat_for_date(
     chat_id: str,
     state_dir: Path = OAT_STATE_DIR,
     dry_run: bool = False,
+    force: bool = False,
 ) -> int:
     delivery_start = date.fromisoformat(oat_plan["delivery"]["start_date"])
     week_index = (day - delivery_start).days // 7
@@ -348,7 +349,7 @@ def send_oat_for_date(
         prayer_index = week_index % len(person["prayers"])
         prayer = person["prayers"][prayer_index]
         marker = state_dir / day.isoformat() / f"{position:02d}-{prayer['id']}.sent"
-        if marker.exists() and not dry_run:
+        if marker.exists() and not dry_run and not force:
             continue
         message = format_oat_message(
             person, prayer, prayer_index + 1, day, position, len(people)
@@ -396,7 +397,13 @@ def send_today(
     )
 
 
-def send_oat_today(*, day: date | None = None, dry_run: bool = False) -> int:
+def send_oat_today(
+    *,
+    day: date | None = None,
+    dry_run: bool = False,
+    force: bool = False,
+    chat_id: str | None = None,
+) -> int:
     target_day = day or datetime.now(ZoneInfo("Asia/Seoul")).date()
     oat_plan = load_oat_plan_for(target_day)
     if not oat_plan or not oat_people_for_date(oat_plan, target_day):
@@ -406,17 +413,18 @@ def send_oat_today(*, day: date | None = None, dry_run: bool = False) -> int:
         print(f"⚠️ 미승인 OAT 기도제목: {target_day.isoformat()}")
         return 0
     token = os.getenv("TELEGRAM_TOKEN")
-    chat_id = "dry-run" if dry_run else os.getenv("PRAYER_CHAT_ID")
-    if not chat_id:
-        chat_id, _ = resolve_owner_recipient()
-    if not dry_run and (not token or not chat_id):
+    destination = "dry-run" if dry_run else chat_id or os.getenv("PRAYER_CHAT_ID")
+    if not destination:
+        destination, _ = resolve_owner_recipient()
+    if not dry_run and (not token or not destination):
         raise RuntimeError("TELEGRAM_TOKEN과 owner 개인방 수신처가 필요합니다.")
     return send_oat_for_date(
         oat_plan,
         target_day,
         token=token or "dry-run",
-        chat_id=chat_id,
+        chat_id=destination,
         dry_run=dry_run,
+        force=force,
     )
 
 
@@ -436,6 +444,8 @@ def main(argv=None) -> int:
     oat_send_parser = subparsers.add_parser("oat-send", help="오늘 배정된 OAT 기도를 별도 발송")
     oat_send_parser.add_argument("--date", type=date.fromisoformat)
     oat_send_parser.add_argument("--dry-run", action="store_true")
+    oat_send_parser.add_argument("--force", action="store_true", help="기존 발송 marker가 있어도 재발송")
+    oat_send_parser.add_argument("--chat-id", help="OAT 기도제목을 받을 owner 대화방")
     args = parser.parse_args(argv)
 
     if args.command == "import":
@@ -462,7 +472,12 @@ def main(argv=None) -> int:
         )
         print(f"✅ 기도제목 {count}명 {'미리보기' if args.dry_run else '발송'} 완료")
     else:
-        count = send_oat_today(day=args.date, dry_run=args.dry_run)
+        count = send_oat_today(
+            day=args.date,
+            dry_run=args.dry_run,
+            force=args.force,
+            chat_id=args.chat_id,
+        )
         print(f"✅ OAT 기도제목 {count}명 {'미리보기' if args.dry_run else '발송'} 완료")
     return 0
 

@@ -71,6 +71,9 @@ python main.py send --date 2026-09-11 --target ko
 # 이번 주 특정 요일 기도제목 재호출 (Telegram owner 개인방: /prayerday 월)
 python main.py prayer send --date 2026-09-14 --force --chat-id "..."
 
+# 이번 주 특정 요일 OAT 기도제목 재호출 (Telegram owner 개인방: /oatday 월)
+python main.py prayer oat-send --date 2026-09-14 --force --chat-id "..."
+
 # 개인 대화방으로 3개 국어 요약본(진도표)만 보내고 싶을 때
 python main.py summary
 
@@ -197,7 +200,8 @@ standby 파일은 자동 발송·Docs 갱신·운영 배포에 사용되지 않�
 같은 06:00 KST 실행에서 요일별 담당자에게 매주 다음 기도제목 1개를 별도 메시지로
 보냅니다. 수요일에는 `정석훈 → 심창민 → 이준우` 순서이며, OAT 전용 marker로
 중복을 막습니다. `python main.py prayer oat-send --date YYYY-MM-DD --dry-run`으로
-해당 날짜를 미리 볼 수 있습니다.
+해당 날짜를 미리 볼 수 있습니다. OAT는 현재 기존 JSON을 읽어 발송하며, 이미지 OCR
+추출 기능은 없습니다.
 
 ---
 
