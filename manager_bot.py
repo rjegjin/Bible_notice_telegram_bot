@@ -11,7 +11,9 @@ import os
 import re
 import subprocess
 import tempfile
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from bot_common import load_secrets, require_env, run_bot
@@ -26,6 +28,7 @@ MAIN_PY  = os.path.join(BASE_DIR, "main.py")
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
 _PLAN_ALBUMS = {}
+_PRAYER_DAYS = {"월": 0, "화": 1, "수": 2, "목": 3, "금": 4, "토": 5}
 
 
 def _parse_plan_captions(caption: str):
@@ -38,6 +41,31 @@ def _parse_plan_captions(caption: str):
 
 def _message_media(message):
     return message.photo[-1] if message.photo else message.document
+
+
+def _send_command_args(args):
+    if len(args) > 2:
+        raise ValueError("사용법: /send [YYYY-MM-DD] [all|ko|en|mn|owner]")
+    target = "all"
+    day = None
+    for value in args:
+        if value in {"all", "ko", "en", "mn", "owner"}:
+            target = value
+        else:
+            day = date.fromisoformat(value).isoformat()
+    command = build_room_send_args(target)
+    if day:
+        command += ["--date", day]
+    return command
+
+
+def _resolve_prayer_day(value, today=None):
+    key = value.removesuffix("요일")
+    if key not in _PRAYER_DAYS:
+        raise ValueError("요일은 월, 화, 수, 목, 금, 토 중 하나로 입력해주세요.")
+    current = today or datetime.now(ZoneInfo("Asia/Seoul")).date()
+    sunday = current - timedelta(days=(current.weekday() + 1) % 7)
+    return sunday + timedelta(days=_PRAYER_DAYS[key] + 1)
 
 
 def _album_result_message(commands, outputs):
@@ -82,6 +110,11 @@ def _menu_inline():
         [InlineKeyboardButton("🏠 내 방 요약", callback_data="bible:summary")],
         [InlineKeyboardButton("📤 그룹 전문 + 내 방 요약", callback_data="bible:send:all")],
         [InlineKeyboardButton("🔄 그룹 전문 + 이 대화방 요약", callback_data="bible:run")],
+        [InlineKeyboardButton("📖 오늘 말씀 재전송", callback_data="bible:today:all")],
+        [
+            InlineKeyboardButton(f"🙏 {day}", callback_data=f"bible:prayer:{index}")
+            for index, day in enumerate(_PRAYER_DAYS)
+        ],
     ])
 
 def _menu_reply():
@@ -105,7 +138,48 @@ async def cmd_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def cmd_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(await asyncio.to_thread(_trigger, "send"))
+    try:
+        command = _send_command_args(context.args)
+    except ValueError as error:
+        await update.message.reply_text(str(error))
+        return
+    subprocess.Popen(
+        [VENV_PY, MAIN_PY, *command],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    await update.message.reply_text(f"`{' '.join(command)}` 실행 시작됨", parse_mode="Markdown")
+
+
+async def _send_prayer_day(message, chat_id, value):
+    owner_chat_id = os.getenv("BIBLE_OWNER_CHAT_ID") or os.getenv("EN_CHAT_ID")
+    if not owner_chat_id or str(chat_id) != str(owner_chat_id):
+        await message.reply_text("이 기능은 owner 개인방에서만 사용할 수 있습니다.")
+        return
+    try:
+        day = _resolve_prayer_day(value)
+    except ValueError as error:
+        await message.reply_text(str(error))
+        return
+    result = await asyncio.to_thread(
+        subprocess.run,
+        [
+            VENV_PY, MAIN_PY, "prayer", "send", "--date", day.isoformat(),
+            "--force", "--chat-id", str(chat_id),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    output = (result.stdout if result.returncode == 0 else result.stderr).strip()
+    await message.reply_text(output or "기도제목 재호출 결과가 없습니다.")
+
+
+async def cmd_prayerday(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) != 1:
+        await update.message.reply_text("사용법: /prayerday 월|화|수|목|금|토")
+        return
+    await _send_prayer_day(update.message, update.effective_chat.id, context.args[0])
 
 async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -303,6 +377,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     parts = query.data.split(":")
     cmd = parts[1]
+    if cmd == "today":
+        today = datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
+        command = _send_command_args([today, parts[2]])
+        subprocess.Popen(
+            [VENV_PY, MAIN_PY, *command],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        await query.edit_message_text(
+            f"📖 *Bible Notice Bot*\n`{' '.join(command)}` 실행 시작됨",
+            parse_mode="Markdown",
+            reply_markup=_menu_inline(),
+        )
+        return
+    if cmd == "prayer":
+        day_name = tuple(_PRAYER_DAYS)[int(parts[2])]
+        await _send_prayer_day(query.message, update.effective_chat.id, day_name)
+        return
     target = parts[2] if len(parts) > 2 else None
     chat_id = update.effective_chat.id if cmd in ("summary", "run") else None
     msg = await asyncio.to_thread(_trigger, cmd, chat_id, target)
@@ -325,6 +417,7 @@ def main():
         CommandHandler("br", cmd_plan_image),
         CommandHandler("prayerapprove", cmd_prayerapprove),
         CommandHandler("prayerpreview", cmd_prayerpreview),
+        CommandHandler("prayerday", cmd_prayerday),
         CallbackQueryHandler(handle_callback),
         MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_prayer_image),
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_menu),

@@ -2,7 +2,7 @@ import os
 import sys
 import argparse
 import asyncio
-from datetime import datetime
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from dotenv import load_dotenv
@@ -112,6 +112,7 @@ async def start():
         default="all",
         help="all=설정된 그룹 전문+owner 요약, ko/en/mn=그룹 전문, owner=개인 요약",
     )
+    send_p.add_argument("--date", type=date.fromisoformat, help="발송 날짜 (YYYY-MM-DD)")
 
     # summary: 개인톡 요약본 발송
     summary_p = subparsers.add_parser("summary", help="개인 대화방으로 3개 국어 요약본만 발송")
@@ -177,15 +178,21 @@ async def start():
             print(f"📅 연/월 생략됨. 자동으로 다음 달({nxt_y}년 {nxt_m}월) 데이터를 생성합니다.")
             generate_monthly_plan(nxt_y, nxt_m)
     elif args.command == "send":
+        send_time = (
+            datetime.combine(args.date, time(), ZoneInfo("Asia/Seoul"))
+            if args.date
+            else kst_now
+        )
         if args.target == "all":
-            await deliver_daily(kst_now)
-            await send_prayers_if_due()
+            await deliver_daily(send_time)
+            if not args.date:
+                await send_prayers_if_due()
         elif args.target == "owner":
             recipient, source = resolve_owner_recipient()
             print(f"💌 MydailyBibleBot owner 요약 수신처: {source}")
-            await send_only_summaries(recipient, kst_now)
+            await send_only_summaries(recipient, send_time)
         else:
-            await broadcast_messages(kst_now, target=args.target)
+            await broadcast_messages(send_time, target=args.target)
     elif args.command == "summary":
         recipient, source = resolve_owner_recipient(args.chat_id)
         print(f"💌 MydailyBibleBot 개인 요약 수신처: {source}")

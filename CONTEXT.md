@@ -1,5 +1,11 @@
 # CONTEXT — Bible Notice Telegram Bot
 
+## 2026-09-18 — 날짜별 말씀·요일별 기도 수동 재호출
+
+- [완료] Telegram `/send [YYYY-MM-DD] [all|ko|en|mn|owner]`로 오늘 또는 지정 날짜 말씀을 다시 보낸다.
+- [완료] owner 개인방 `/prayerday 월|화|수|목|금|토`와 `/manage` 월~토 버튼으로 이번 주 해당 요일 기도제목을 재호출한다.
+- [안전] 수동 기도 재호출은 기존 `.sent` marker를 삭제하지 않고 `--force` 호출에서만 우회한다.
+
 ## 2026-09-18 — OCR 승인 경계·운영 검증 완료
 
 - [완료] Telegram BR/QT 앨범은 검증된 standby JSON을 만들고 `plan publish`는 그 동일 JSON을 재OCR 없이 승격한다.

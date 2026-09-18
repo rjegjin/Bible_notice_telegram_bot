@@ -306,6 +306,7 @@ def send_for_date(
     chat_id: str,
     state_dir: Path = STATE_DIR,
     dry_run: bool = False,
+    force: bool = False,
 ) -> int:
     people_by_name = {person["name"]: person for person in plan.get("people", [])}
     people = [
@@ -315,7 +316,7 @@ def send_for_date(
     sent = 0
     for index, person in enumerate(people, 1):
         marker = state_dir / day.isoformat() / f"{index:02d}.sent"
-        if marker.exists() and not dry_run:
+        if marker.exists() and not dry_run and not force:
             continue
         message = format_message(person, day, index, len(people))
         if dry_run:
@@ -364,7 +365,13 @@ def send_oat_for_date(
     return sent
 
 
-def send_today(*, day: date | None = None, dry_run: bool = False) -> int:
+def send_today(
+    *,
+    day: date | None = None,
+    dry_run: bool = False,
+    force: bool = False,
+    chat_id: str | None = None,
+) -> int:
     target_day = day or datetime.now(ZoneInfo("Asia/Seoul")).date()
     plan = load_plan_for(target_day)
     if not plan or target_day.isoformat() not in plan.get("assignments", {}):
@@ -374,13 +381,18 @@ def send_today(*, day: date | None = None, dry_run: bool = False) -> int:
         print(f"⚠️ 미승인 기도제목: {plan['week_start']} (prayer approve 필요)")
         return 0
     token = os.getenv("TELEGRAM_TOKEN")
-    chat_id = "dry-run" if dry_run else os.getenv("PRAYER_CHAT_ID")
-    if not chat_id:
-        chat_id, _ = resolve_owner_recipient()
-    if not dry_run and (not token or not chat_id):
+    destination = "dry-run" if dry_run else chat_id or os.getenv("PRAYER_CHAT_ID")
+    if not destination:
+        destination, _ = resolve_owner_recipient()
+    if not dry_run and (not token or not destination):
         raise RuntimeError("TELEGRAM_TOKEN과 owner 개인방 수신처가 필요합니다.")
     return send_for_date(
-        plan, target_day, token=token or "dry-run", chat_id=chat_id, dry_run=dry_run
+        plan,
+        target_day,
+        token=token or "dry-run",
+        chat_id=destination,
+        dry_run=dry_run,
+        force=force,
     )
 
 
@@ -419,6 +431,8 @@ def main(argv=None) -> int:
     send_parser = subparsers.add_parser("send", help="오늘 배정된 사람을 한 메시지씩 발송")
     send_parser.add_argument("--date", type=date.fromisoformat)
     send_parser.add_argument("--dry-run", action="store_true")
+    send_parser.add_argument("--force", action="store_true", help="기존 발송 marker가 있어도 재발송")
+    send_parser.add_argument("--chat-id", help="기도제목을 받을 owner 대화방")
     oat_send_parser = subparsers.add_parser("oat-send", help="오늘 배정된 OAT 기도를 별도 발송")
     oat_send_parser.add_argument("--date", type=date.fromisoformat)
     oat_send_parser.add_argument("--dry-run", action="store_true")
@@ -440,7 +454,12 @@ def main(argv=None) -> int:
             raise FileNotFoundError("검토할 주간 기도 plan이 없습니다.")
         print(format_plan_preview(json.loads(plans[0].read_text(encoding="utf-8"))))
     elif args.command == "send":
-        count = send_today(day=args.date, dry_run=args.dry_run)
+        count = send_today(
+            day=args.date,
+            dry_run=args.dry_run,
+            force=args.force,
+            chat_id=args.chat_id,
+        )
         print(f"✅ 기도제목 {count}명 {'미리보기' if args.dry_run else '발송'} 완료")
     else:
         count = send_oat_today(day=args.date, dry_run=args.dry_run)

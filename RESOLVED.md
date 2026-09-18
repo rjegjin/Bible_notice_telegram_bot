@@ -5,6 +5,12 @@
 
 ---
 
+## 2026-09-18 — 날짜별 말씀·요일별 기도 Telegram 재호출
+
+- 내용: `/send` 날짜 인자와 `/prayerday` 요일 명령, `/manage` 오늘 말씀·월~토 기도 버튼을 추가했다.
+- 결과: 지정 날짜 말씀과 이번 주 특정 요일 기도제목을 Telegram에서 다시 보낼 수 있고, 기도 자동발송 marker는 보존된다.
+- 파일: `main.py`, `manager_bot.py`, `tools/prayer_manager.py`, `tests/test_manager_bot.py`, `tests/test_prayer_manager.py`
+
 ## 2026-09-18 — Telegram OCR부터 승인·Docs·발송까지 안전 경계 완성
 
 - 내용: BR/QT 앨범 standby 승격, 다국어 책 전환, 주간기도 원본·전체 미리보기, future-only 승인, Docs PDF 검증을 완료했다.

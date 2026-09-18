@@ -1,7 +1,14 @@
 import unittest
+from datetime import date
 from types import SimpleNamespace
 
-from manager_bot import _album_result_message, _message_media, _parse_plan_captions
+from manager_bot import (
+    _album_result_message,
+    _message_media,
+    _parse_plan_captions,
+    _resolve_prayer_day,
+    _send_command_args,
+)
 
 
 class PlanCaptionTests(unittest.TestCase):
@@ -30,6 +37,18 @@ class PlanCaptionTests(unittest.TestCase):
         self.assertIn("standby JSON 생성", message)
         self.assertIn("운영 반영 안 됨", message)
         self.assertNotIn("대기 중", message)
+
+
+class ManualSendTests(unittest.TestCase):
+    def test_builds_historical_bible_send_command(self):
+        self.assertEqual(
+            _send_command_args(["2026-09-11", "ko"]),
+            ["send", "--target", "ko", "--date", "2026-09-11"],
+        )
+
+    def test_resolves_weekday_inside_current_sunday_to_saturday_week(self):
+        self.assertEqual(_resolve_prayer_day("월", date(2026, 9, 18)), date(2026, 9, 14))
+        self.assertEqual(_resolve_prayer_day("토요일", date(2026, 9, 18)), date(2026, 9, 19))
 
 
 if __name__ == "__main__":

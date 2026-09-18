@@ -120,6 +120,27 @@ class PrayerManagerTests(unittest.TestCase):
         self.assertEqual(send.call_count, 3)
         self.assertTrue(all(call.args[0].startswith("🙏 주간 기도제목") for call in send.call_args_list))
 
+    @patch("tools.prayer_manager.send_telegram", return_value=True)
+    def test_force_resends_without_deleting_existing_markers(self, send):
+        plan = build_plan("2026-08-23", "2026-08-29", self.people, "abc")
+        plan["approved"] = True
+        day = date(2026, 8, 24)
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            first = send_for_date(
+                plan, day, token="token", chat_id="owner", state_dir=state_dir
+            )
+            repeated = send_for_date(
+                plan,
+                day,
+                token="token",
+                chat_id="owner",
+                state_dir=state_dir,
+                force=True,
+            )
+        self.assertEqual((first, repeated), (3, 3))
+        self.assertEqual(send.call_count, 6)
+
     @patch("tools.prayer_manager.send_for_date")
     def test_unapproved_plan_never_sends(self, send):
         plan = build_plan("2026-08-23", "2026-08-29", self.people, "abc")
@@ -139,6 +160,24 @@ class PrayerManagerTests(unittest.TestCase):
 
         resolve_owner.assert_called_once_with()
         self.assertEqual(send.call_args.kwargs["chat_id"], "owner")
+
+    @patch("tools.prayer_manager.send_for_date", return_value=3)
+    def test_manual_recall_uses_explicit_chat_and_force(self, send):
+        plan = build_plan("2026-08-23", "2026-08-29", self.people, "abc")
+        plan["approved"] = True
+        with patch("tools.prayer_manager.load_plan_for", return_value=plan), patch.dict(
+            prayer_manager.os.environ, {"TELEGRAM_TOKEN": "token"}, clear=True
+        ):
+            self.assertEqual(
+                send_today(
+                    day=date(2026, 8, 24),
+                    force=True,
+                    chat_id="current-owner-chat",
+                ),
+                3,
+            )
+        self.assertEqual(send.call_args.kwargs["chat_id"], "current-owner-chat")
+        self.assertTrue(send.call_args.kwargs["force"])
 
     def test_oat_attaches_supplemental_person_after_weekly_anchor(self):
         oat = {

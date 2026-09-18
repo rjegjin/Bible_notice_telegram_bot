@@ -65,6 +65,12 @@ python main.py send --target ko  # ko / en / mn / owner / all
 # all: KO/MN 그룹에는 전문, owner 개인방에는 3개 국어 요약만 발송
 python main.py send --target all
 
+# 지정 날짜 말씀 재전송 (Telegram: /send 2026-09-11 ko)
+python main.py send --date 2026-09-11 --target ko
+
+# 이번 주 특정 요일 기도제목 재호출 (Telegram owner 개인방: /prayerday 월)
+python main.py prayer send --date 2026-09-14 --force --chat-id "..."
+
 # 개인 대화방으로 3개 국어 요약본(진도표)만 보내고 싶을 때
 python main.py summary
 
@@ -250,6 +256,8 @@ OPENAI_MODEL="gpt-4o"  # 기본값: gpt-4o
 기본적으로 `mh_bot` 서버의 `systemd` user timer(`bible-daily-send.timer`)가 매일 정해진 시간에 `manager_bot.py run` 명령을 수행합니다. (실제 발송은 `mh_bot`@100.103.20.9에서 관리됨)
 
 `GitHub Actions`의 `daily_bible.yml`은 `workflow_dispatch` 전용이며, 자동 스케줄은 systemd timer로 대체되었습니다.
+
+관리봇 `/manage`에는 오늘 말씀 재전송과 이번 주 월~토 기도제목 재호출 버튼이 있습니다. 기도제목 수동 재호출은 기존 발송 marker를 지우지 않으므로 정기 자동발송의 중복 방지 상태에 영향을 주지 않습니다.
 
 ---
 *마지막 업데이트: 2026년 7월 6일 (bot_common 헬퍼 모듈 도입 + Gemini 기본값 정의)*
