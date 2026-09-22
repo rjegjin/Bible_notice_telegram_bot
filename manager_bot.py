@@ -131,6 +131,46 @@ def _menu_reply():
     ], resize_keyboard=True)
 
 
+HELP_TEXT = """📖 Bible Notice Bot
+
+━━ 이미지로 등록하기 (owner 개인방에서만) ━━
+
+🙏 주간기도제목
+  사진 1장을 보내면서 caption에 `/prayer`
+  → OCR 결과가 정확히 13명일 때만 저장된다
+  `/prayerpreview` 로 검토 → `/prayerapprove` 로 승인
+
+📅 월간 QT·BR 계획표
+  QT·BR 사진 2장을 **한 앨범으로** 보내고 caption에 두 줄:
+      /qt 2026 10
+      /br 2026 10
+  · caption 줄 순서 = 사진 순서
+  · 한 앨범에 같은 연월의 /qt 와 /br 을 하나씩
+  · 한 장만 보낼 때는 caption 한 줄 (`/qt 2026 10`)
+  → standby JSON 생성 + 월 전체 검증까지만 한다.
+    **운영에는 반영되지 않는다.** 반영하려면 터미널에서:
+      python main.py plan publish 2026 10
+
+━━ 발송 ━━
+/send [YYYY-MM-DD] [all|ko|en|mn|owner]
+    말씀 발송 (인자 없으면 오늘·전체)
+/summary      내 방으로 3개 국어 요약본
+/run          그룹 전문 + 이 방 요약
+/prayerday 월|화|수|목|금|토    그 요일 기도제목 재호출
+/oatday    월|화|수|목|금|토    그 요일 OAT 재호출
+
+━━ 기타 ━━
+/prayerpreview  저장된 기도제목 검토
+/prayerapprove  기도제목 승인
+/manage         버튼 메뉴
+/chatid         이 대화방 ID
+/help           이 도움말"""
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(HELP_TEXT)
+
+
 async def cmd_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📖 *Bible Notice Bot*\n메뉴를 선택하세요:",
@@ -216,14 +256,14 @@ async def cmd_chatid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_prayer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "주간기도제목 이미지를 사진으로 보내면서 caption에 /prayer 를 입력해주세요. "
-        "OCR 결과가 정확히 13명일 때만 저장됩니다."
+        "OCR 결과가 정확히 13명일 때만 저장됩니다. 전체 절차는 /help 참고."
     )
 
 
 async def cmd_plan_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "사진 caption을 `/qt 2026 10` 또는 `/br 2026 10`처럼 입력해주세요. "
-        "두 이미지가 모두 모이면 검증된 standby JSON을 만듭니다.",
+        "두 이미지가 모두 모이면 검증된 standby JSON을 만듭니다. 전체 절차는 /help 참고.",
         parse_mode="Markdown",
     )
 
@@ -430,10 +470,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def post_init(app):
+    """"/" 만 쳐도 Telegram이 명령 목록을 띄우게 한다."""
+    from telegram import BotCommand
+    try:
+        await app.bot.set_my_commands([
+            BotCommand("help", "명령어와 이미지 등록 절차"),
+            BotCommand("send", "말씀 발송 (/send [날짜] [all|ko|en|mn|owner])"),
+            BotCommand("summary", "내 방으로 3개 국어 요약"),
+            BotCommand("run", "그룹 전문 + 이 방 요약"),
+            BotCommand("prayer", "주간기도제목 이미지 등록 안내"),
+            BotCommand("qt", "월간 QT 계획표 이미지 등록 안내"),
+            BotCommand("br", "월간 BR 계획표 이미지 등록 안내"),
+            BotCommand("prayerpreview", "저장된 기도제목 검토"),
+            BotCommand("prayerapprove", "기도제목 승인"),
+            BotCommand("prayerday", "요일 기도제목 재호출"),
+            BotCommand("oatday", "요일 OAT 재호출"),
+            BotCommand("manage", "버튼 메뉴"),
+            BotCommand("chatid", "이 대화방 ID"),
+        ])
+    except Exception:
+        log.exception("명령 목록 등록 실패 — 봇 동작에는 영향 없음")
+
+
 def main():
     handlers = [
         CommandHandler("start",   cmd_manage),
         CommandHandler("manage",  cmd_manage),
+        CommandHandler("help",    cmd_help),
         CommandHandler("send",    cmd_send),
         CommandHandler("summary", cmd_summary),
         CommandHandler("run",     cmd_run),
@@ -449,7 +513,7 @@ def main():
         MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_prayer_image),
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_menu),
     ]
-    run_bot(TOKEN, handlers)
+    run_bot(TOKEN, handlers, post_init=post_init)
 
 if __name__ == "__main__":
     main()
