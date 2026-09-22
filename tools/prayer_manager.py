@@ -105,7 +105,10 @@ def _clean_prayers(values) -> list[str]:
 def build_plan(week_start: str, week_end: str, people: list[dict], source_sha256: str) -> dict:
     start = date.fromisoformat(week_start)
     end = date.fromisoformat(week_end)
-    if start.weekday() != 6 or end != start + timedelta(days=6):
+    expected_end = start + timedelta(days=6)
+    if start.weekday() == 6 and end == start + timedelta(days=7):
+        end = expected_end
+    if start.weekday() != 6 or end != expected_end:
         raise ValueError("주간 날짜는 일요일부터 토요일까지여야 합니다.")
     if len(people) != 13:
         raise ValueError(f"개인 기도제목은 정확히 13명이어야 합니다: {len(people)}명")

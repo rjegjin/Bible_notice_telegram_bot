@@ -37,6 +37,12 @@ class PrayerManagerTests(unittest.TestCase):
         self.assertEqual(plan["assignments"]["2026-08-24"][0], "사람1")
         self.assertEqual(plan["assignments"]["2026-08-29"][-1], "사람13")
 
+    def test_next_sunday_end_date_is_normalized_to_saturday(self):
+        plan = build_plan("2026-09-20", "2026-09-27", self.people, "abc")
+
+        self.assertEqual(plan["week_end"], "2026-09-26")
+        self.assertEqual(max(plan["assignments"]), "2026-09-26")
+
     def test_two_columns_keep_order_and_attach_leading_continuation(self):
         class Provider:
             def __init__(self, people):

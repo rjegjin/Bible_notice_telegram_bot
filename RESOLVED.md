@@ -5,6 +5,12 @@
 
 ---
 
+## 2026-09-23 — 주간기도 다음 일요일 종료일 보정
+
+- 내용: `9/20~9/27`처럼 종료일이 다음 일요일로 인식되면 `9/26` 토요일로 정규화한다.
+- 결과: 해당 OCR 표기는 오류 없이 저장되고 월~토 배정 원칙은 유지된다.
+- 파일: `tools/prayer_manager.py`, `tests/test_prayer_manager.py`
+
 ## 2026-09-18 — OAT 기도 Telegram 요일별 재호출
 
 - 내용: `/oatday` 명령과 `/manage` OAT 월~토 버튼, OAT `--force --chat-id` 발송을 추가했다.
