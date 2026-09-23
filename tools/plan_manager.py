@@ -527,6 +527,9 @@ def _build_parser() -> argparse.ArgumentParser:
     stage_image.add_argument("kind", choices=("BR", "QT"))
     stage_image.add_argument("image")
 
+    classify = commands.add_parser("classify", help="이미지가 BR인지 QT인지 판별해 출력")
+    classify.add_argument("image")
+
     reparse = commands.add_parser("reparse", help="backup 후 이미지/OCR로 월 plan 재생성")
     reparse.add_argument("year", type=int)
     reparse.add_argument("month", type=int)
@@ -774,6 +777,13 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 waiting = "QT" if args.kind == "BR" else "BR"
                 print(f"⏳ {args.kind} 저장 완료 · {waiting} 이미지 대기 중")
+        elif args.plan_command == "classify":
+            from tools.plan_parser import classify_plan_image
+
+            kind = classify_plan_image(args.image)
+            if not kind:
+                raise SystemExit("판별 실패")
+            print(kind)
         elif args.plan_command == "reparse":
             if args.yes or _confirm("현재 파일을 backup하고 OCR로 다시 생성할까요?"):
                 backup = manager.create_backup(args.year, args.month)

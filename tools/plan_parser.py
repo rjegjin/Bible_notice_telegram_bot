@@ -154,6 +154,47 @@ QT_PLAN_SCHEMA = {
 }
 
 
+PLAN_KIND_SCHEMA = {
+    "name": "plan_kind",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "kind": {"type": "string", "enum": ["BR", "QT"], "description": "BR=성경통독표, QT=QT 달력표"},
+        },
+        "required": ["kind"],
+        "additionalProperties": False,
+    },
+}
+
+KIND_PROMPT = """
+Classify this Korean church bible-plan image as exactly one of:
+- "BR": a Bible Reading Plan TABLE with column headers for date and book columns
+  such as 신약(NT), 구약(OT), 시(Psalms), sometimes 잠(Proverbs). Usually two
+  side-by-side tables (days 1-16 and 17-31).
+- "QT": a Quiet Time CALENDAR laid out as a month grid, where each cell holds a
+  date number with a single passage printed under it.
+Answer with the label only.
+"""
+
+
+def classify_plan_image(image_path):
+    """이미지가 BR(통독표)인지 QT(달력표)인지 판별한다. 실패하면 None.
+
+    caption 줄 순서와 사진 순서를 사람이 맞추지 않아도 되게 하려는 것이다.
+    두 표는 레이아웃이 확연히 달라(표 vs 달력) 판별이 어렵지 않다.
+    """
+    try:
+        provider = get_provider()
+        with PIL.Image.open(image_path) as image:
+            result = provider.generate_from_images([image], KIND_PROMPT, PLAN_KIND_SCHEMA)
+    except Exception as error:  # 판별 실패는 치명적이지 않다 — 호출자가 caption으로 되돌아간다
+        logger.warning(f"⚠️ 이미지 종류 판별 실패: {error}")
+        return None
+    kind = (result or {}).get("kind", "").upper()
+    return kind if kind in {"BR", "QT"} else None
+
+
 def build_br_prompt(year_str: str, month_str: str) -> str:
     return f"""
     Transcribe ONLY the Bible Reading Plan table for {year_str}-{month_str}.
