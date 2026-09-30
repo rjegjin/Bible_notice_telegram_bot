@@ -1,5 +1,11 @@
 # CONTEXT — Bible Notice Telegram Bot
 
+## 2026-09-30 — Telegram 월별 plan 게시
+
+- [구현] 업로드 결과의 내용 확인 → 승인·게시 버튼 및 `/planpublish YEAR MONTH`를 연결했다.
+- [안전] owner 개인방만 허용하고 검토 JSON hash 확인·사본 게시·중복 작업 lock을 적용한다. Docs 검증 후 운영 JSON을 교체한다.
+- [미완료] 현 세션 네트워크 제한으로 mhbot SSH 배포 불가 (`socket: Operation not permitted`). 로컬 테스트 완료 후 운영 동기화 필요.
+
 ## 2026-09-23 — 주간기도 종료일 다음 일요일 OCR 예외
 
 - [완료] 시작일이 일요일이고 OCR 종료일이 정확히 다음 일요일이면 실제 운영 범위인 토요일로 자동 보정한다.

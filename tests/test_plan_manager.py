@@ -148,6 +148,12 @@ class PlanManagerTests(unittest.TestCase):
         self.assertEqual(json.loads(self.plan_path.read_text(encoding="utf-8")), standby)
 
     def test_docs_failure_stops_deploy_and_notification(self):
+        before = self.plan_path.read_bytes()
+        standby_dir = self.plans_dir / 'standby'
+        standby_dir.mkdir()
+        changed = valid_july_plan()
+        changed['1'][4] = '요 1:3-4'
+        (standby_dir / '2026_07.json').write_text(json.dumps(changed))
         with patch('tools.plan_manager.upsert_quiet_time_tab', create=True,
                    side_effect=RuntimeError('Docs readback failed')):
             with self.assertRaisesRegex(RuntimeError, 'Docs readback failed'):
@@ -156,7 +162,9 @@ class PlanManagerTests(unittest.TestCase):
                     generator=lambda *args: self.original,
                     deployer=lambda *args: self.fail('must not deploy'),
                     notifier=lambda *args: self.fail('must not notify'),
+                    standby_dir=standby_dir,
                 )
+        self.assertEqual(self.plan_path.read_bytes(), before)
 
     def test_sheet_runs_before_deploy_and_can_be_skipped(self):
         for enabled in (True, False):

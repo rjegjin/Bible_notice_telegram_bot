@@ -5,6 +5,12 @@
 
 ---
 
+## 2026-09-30 — 제한된 세션에서 mhbot SSH 배포
+
+- 증상: SSH가 연결 전 `socket: Operation not permitted`로 종료했다.
+- 결론: 현재 세션의 네트워크 제한으로 운영 배포를 수행할 수 없다.
+- 다음에는 이렇게: 로컬 검증을 완료하고 네트워크 허용 세션에서 운영 동기화·서비스 readback을 진행한다.
+
 ## 2026-09-12 — `plan_manager.py`만 배포해 caption 처리가 import에서 실패
 
 - 증상: `/qt`·`/br` caption 처리 시 `ModuleNotFoundError: tools.quiet_time_docs`가 발생했다.

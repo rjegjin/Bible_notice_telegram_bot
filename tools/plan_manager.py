@@ -434,16 +434,20 @@ def publish_plan(
         if standby_path.exists():
             after_plan = json.loads(standby_path.read_text(encoding="utf-8"))
             manager.validate(year, month, after_plan)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = path.with_suffix(".json.tmp")
-            temporary.write_text(manager._serialize(after_plan), encoding="utf-8")
-            temporary.replace(path)
         else:
             generated = generator(year, month)
             if generated is None:
                 raise RuntimeError("standby가 없고 asset 재파싱도 실패했습니다.")
-        after_plan = manager.load(year, month)
+            after_plan = manager.load(year, month)
         manager.validate(year, month, after_plan)
+        if create_sheet:
+            url = (sheet_writer or upsert_quiet_time_tab)(after_plan, year, month)
+            print(f"📄 Quiet Time 적용 시트: {url}")
+        if standby_path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(".json.tmp")
+            temporary.write_text(manager._serialize(after_plan), encoding="utf-8")
+            temporary.replace(path)
     except Exception:
         if backup_path is not None:
             shutil.copy2(backup_path, path)
@@ -460,9 +464,6 @@ def publish_plan(
             tofile=f"{path.name} (standby approved)",
         )
     )
-    if create_sheet:
-        url = (sheet_writer or upsert_quiet_time_tab)(after_plan, year, month)
-        print(f"📄 Quiet Time 적용 시트: {url}")
     deployer(manager, year, month, host, remote_project)
     if send_test:
         notifier(host, remote_project, year, month)

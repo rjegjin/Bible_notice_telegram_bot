@@ -1,4 +1,8 @@
 import unittest
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch, AsyncMock
 from datetime import date
 from types import SimpleNamespace
 
@@ -40,6 +44,19 @@ class PlanCaptionTests(unittest.TestCase):
 
 
 class ManualSendTests(unittest.TestCase):
+    def test_review_blocks_changed_standby(self):
+        from manager_bot import _review_standby
+        from tests.test_plan_manager import valid_july_plan
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / '2026_07.json'
+            path.write_text(json.dumps(valid_july_plan()))
+            with patch('tools.plan_manager.DEFAULT_STANDBY_DIR', root):
+                _, _, digest = _review_standby(2026, 7)
+                path.write_text(json.dumps(valid_july_plan()) + '\n')
+                with self.assertRaisesRegex(ValueError, '변경'):
+                    _review_standby(2026, 7, digest)
+
     def test_builds_historical_bible_send_command(self):
         self.assertEqual(
             _send_command_args(["2026-09-11", "ko"]),
@@ -49,6 +66,37 @@ class ManualSendTests(unittest.TestCase):
     def test_resolves_weekday_inside_current_sunday_to_saturday_week(self):
         self.assertEqual(_resolve_prayer_day("월", date(2026, 9, 18)), date(2026, 9, 14))
         self.assertEqual(_resolve_prayer_day("토요일", date(2026, 9, 18)), date(2026, 9, 19))
+
+
+class PlanPublishCallbackTests(unittest.IsolatedAsyncioTestCase):
+    async def test_publish_callback_calls_reviewed_publish_and_reports_success(self):
+        from manager_bot import handle_plan_callback
+        message = SimpleNamespace(reply_text=AsyncMock())
+        query = SimpleNamespace(
+            data='plan:publish:2026:10:hash', message=message,
+            answer=AsyncMock(), edit_message_text=AsyncMock(),
+        )
+        update = SimpleNamespace(callback_query=query, effective_chat=SimpleNamespace(id=123))
+        with patch.dict('os.environ', {'BIBLE_OWNER_CHAT_ID': '123'}), patch(
+            'manager_bot._publish_reviewed_plan'
+        ) as publish:
+            await handle_plan_callback(update, None)
+        publish.assert_called_once_with(2026, 10, 'hash')
+        self.assertIn('게시 완료', message.reply_text.call_args.args[0])
+
+    async def test_non_owner_cannot_publish(self):
+        from manager_bot import handle_plan_callback
+        message = SimpleNamespace(reply_text=AsyncMock())
+        query = SimpleNamespace(
+            data='plan:publish:2026:10:hash', message=message,
+            answer=AsyncMock(), edit_message_text=AsyncMock(),
+        )
+        update = SimpleNamespace(callback_query=query, effective_chat=SimpleNamespace(id=456))
+        with patch.dict('os.environ', {'BIBLE_OWNER_CHAT_ID': '123'}), patch(
+            'manager_bot._publish_reviewed_plan'
+        ) as publish:
+            await handle_plan_callback(update, None)
+        publish.assert_not_called()
 
 
 if __name__ == "__main__":

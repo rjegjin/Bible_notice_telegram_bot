@@ -6,6 +6,8 @@ TELEGRAM_TOKEN으로 상시 실행, 자기 채팅방 직접 관리.
 - 매일 자동 발송은 mh_bot systemd timer(bible-daily-send.timer)가 담당
 """
 import asyncio
+import hashlib
+import json
 import logging
 import os
 import re
@@ -29,6 +31,103 @@ MAIN_PY  = os.path.join(BASE_DIR, "main.py")
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
 _PLAN_ALBUMS = {}
+_PLAN_PUBLISH_LOCK = asyncio.Lock()
+
+
+def _review_standby(year, month, expected=None):
+    from tools.plan_manager import DEFAULT_STANDBY_DIR
+    from tools.plan_parser import validate_monthly_plan
+
+    path = DEFAULT_STANDBY_DIR / f"{year:04d}_{month:02d}.json"
+    raw = path.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()[:16]
+    if expected is not None and digest != expected:
+        raise ValueError("검토 이후 standby가 변경되었습니다. 내용을 다시 확인해주세요.")
+    plan = json.loads(raw)
+    validate_monthly_plan(plan, year, month)
+    return raw, plan, digest
+
+
+def _publish_reviewed_plan(year, month, expected):
+    from tools.plan_manager import PlanManager, publish_plan
+
+    raw, _, _ = _review_standby(year, month, expected)
+    with tempfile.TemporaryDirectory() as directory:
+        snapshot = Path(directory)
+        (snapshot / f"{year:04d}_{month:02d}.json").write_bytes(raw)
+        publish_plan(
+            PlanManager(), year, month, "", BASE_DIR, send_test=False,
+            standby_dir=snapshot,
+            deployer=lambda manager, year, month, *_: manager.validate(year, month),
+        )
+
+
+async def _show_plan_review(message, year, month):
+    _, plan, digest = await asyncio.to_thread(_review_standby, year, month)
+    lines = [f"📖 {year}년 {month}월 게시 전 검토 (아직 운영 반영 안 됨)"]
+    for day in sorted(plan, key=int):
+        values = plan[day]
+        lines.append(f"{day}일 · QT: {values[4]}\n신약: {values[0]} · 구약: {values[1]} · 시편: {values[2]} · 잠언: {values[3]}")
+    await _reply_chunks(message, '\n\n'.join(lines))
+    await message.reply_text(
+        "본문을 확인한 뒤 승인·게시를 누르면 Docs 월 탭과 운영 plan을 갱신합니다.",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("✅ 승인·게시", callback_data=f"plan:publish:{year}:{month}:{digest}"),
+            InlineKeyboardButton("취소", callback_data="plan:cancel"),
+        ]]),
+    )
+
+
+async def cmd_planpublish(update, context):
+    owner = os.getenv("BIBLE_OWNER_CHAT_ID") or os.getenv("EN_CHAT_ID")
+    if not owner or str(update.effective_chat.id) != str(owner):
+        await update.effective_message.reply_text("이 기능은 owner 개인방에서만 사용할 수 있습니다.")
+        return
+    try:
+        if len(context.args) != 2:
+            raise ValueError("사용법: /planpublish 2026 10")
+        year, month = map(int, context.args)
+        await _show_plan_review(update.effective_message, year, month)
+    except (ValueError, FileNotFoundError) as error:
+        await update.effective_message.reply_text(f"❌ 검토 불가: {error}")
+
+
+async def _offer_plan_review(message, year, month, output):
+    if "✅ standby 생성:" in output:
+        await message.reply_text(
+            "standby 준비 완료 · 내용 확인 후 게시하세요.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("📖 내용 확인", callback_data=f"plan:review:{int(year)}:{int(month)}"),
+                InlineKeyboardButton("취소", callback_data="plan:cancel"),
+            ]]),
+        )
+
+
+async def handle_plan_callback(update, context):
+    query = update.callback_query
+    await query.answer()
+    owner = os.getenv("BIBLE_OWNER_CHAT_ID") or os.getenv("EN_CHAT_ID")
+    if not owner or str(update.effective_chat.id) != str(owner):
+        await query.message.reply_text("이 기능은 owner 개인방에서만 사용할 수 있습니다.")
+        return
+    parts = query.data.split(':')
+    if parts[1] == 'cancel':
+        await query.edit_message_text("게시 취소 · standby는 보관됩니다.")
+        return
+    try:
+        year, month = map(int, parts[2:4])
+        if parts[1] == 'review':
+            await _show_plan_review(query.message, year, month)
+            return
+        if _PLAN_PUBLISH_LOCK.locked():
+            await query.message.reply_text("게시 작업이 진행 중입니다. 완료 후 다시 확인해주세요.")
+            return
+        async with _PLAN_PUBLISH_LOCK:
+            await query.edit_message_text(f"⏳ {year}년 {month}월 Docs 검증·운영 반영 중...")
+            await asyncio.to_thread(_publish_reviewed_plan, year, month, parts[4])
+            await query.message.reply_text(f"✅ {year}년 {month}월 게시 완료 · Docs 월 탭 검증 및 운영 plan 반영 완료")
+    except Exception as error:
+        await query.message.reply_text(f"❌ 게시/검토 실패: {error}\n/planpublish {parts[2]} {parts[3]}으로 다시 검토해주세요.")
 # 캡션 없이 올라온 앨범 사진을 기억해 둔다 — 나중에 caption을 edit 하면 그때 처리한다.
 # 단일 사진은 edit 이벤트가 사진을 그대로 싣고 오므로 기억할 필요가 없다.
 _PENDING_ALBUMS = {}
@@ -178,8 +277,8 @@ HELP_TEXT = """📖 Bible Notice Bot
   · 한 장만 보낼 때는 caption 한 줄 (`/qt 2026 10`)
   · caption 없이 먼저 올린 뒤 나중에 caption을 **편집**해도 된다
   → standby JSON 생성 + 월 전체 검증까지만 한다.
-    **운영에는 반영되지 않는다.** 반영하려면 터미널에서:
-      python main.py plan publish 2026 10
+    내용 확인 → 승인·게시 버튼으로 Docs·운영 반영까지 진행한다.
+    `/planpublish 2026 10` 으로 검토 화면을 다시 열 수 있다.
 
 ━━ 발송 ━━
 /send [YYYY-MM-DD] [all|ko|en|mn|owner]
@@ -408,6 +507,7 @@ async def _process_plan_album(message, photos, commands):
         for path, kind in zip(paths, kinds):
             outputs.append(await _stage_plan_image(path, kind, year, month))
         await message.reply_text(f"{note}\n{_album_result_message(commands, outputs)}"[-3500:])
+        await _offer_plan_review(message, year, month, outputs[-1])
     except subprocess.TimeoutExpired:
         await message.reply_text("❌ 이미지 분석 시간이 초과되었습니다. 다시 시도해주세요.")
     except Exception as error:
@@ -484,6 +584,7 @@ async def handle_prayer_image(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             output = await _run_plan_photo(_message_media(message), kind, year, month)
             await message.reply_text(output[-3500:] or "이미지 처리 결과가 없습니다.")
+            await _offer_plan_review(message, year, month, output)
         except subprocess.TimeoutExpired:
             await message.reply_text("❌ 이미지 분석 시간이 초과되었습니다. 다시 시도해주세요.")
         return
@@ -533,6 +634,9 @@ async def handle_text_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📖 *Bible Notice Bot*\n{msg}", parse_mode="Markdown")
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query.data.startswith("plan:"):
+        await handle_plan_callback(update, context)
+        return
     query = update.callback_query
     await query.answer()
     parts = query.data.split(":")
@@ -585,6 +689,7 @@ async def post_init(app):
             BotCommand("prayer", "주간기도제목 이미지 등록 안내"),
             BotCommand("qt", "월간 QT 계획표 이미지 등록 안내"),
             BotCommand("br", "월간 BR 계획표 이미지 등록 안내"),
+            BotCommand("planpublish", "월간 plan 검토·승인·게시"),
             BotCommand("prayerpreview", "저장된 기도제목 검토"),
             BotCommand("prayerapprove", "기도제목 승인"),
             BotCommand("prayerday", "요일 기도제목 재호출"),
@@ -608,6 +713,7 @@ def main():
         CommandHandler("prayer",  cmd_prayer),
         CommandHandler("qt", cmd_plan_image),
         CommandHandler("br", cmd_plan_image),
+        CommandHandler("planpublish", cmd_planpublish),
         CommandHandler("prayerapprove", cmd_prayerapprove),
         CommandHandler("prayerpreview", cmd_prayerpreview),
         CommandHandler("prayerday", cmd_prayerday),

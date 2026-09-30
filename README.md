@@ -191,6 +191,11 @@ standby 파일은 자동 발송·Docs 갱신·운영 배포에 사용되지 않�
 `plan publish`로 **같은 JSON을 재OCR 없이** 승격합니다. standby가 없을 때만
 기존 이미지 OCR 경로를 사용합니다.
 
+Telegram에서는 업로드 완료 후 `내용 확인 → 승인·게시`를 누르거나
+`/planpublish 2026 10`으로 검토 화면을 다시 열면 됩니다. owner 개인방에서만
+허용하며, 검토 후 standby가 바뀌면 재검토가 필요합니다. Docs 월 탭 검증 후
+현재 운영 서버의 JSON을 반영하고 결과를 안내합니다.
+
 주간기도 원본은 `data/prayers/sources/`에 주차별로 보존됩니다. OCR 직후 전체
 기도문 미리보기가 owner 방에 분할 전송되며 `/prayerpreview`로 다시 확인할 수
 있습니다. `/prayerapprove`는 `future_only` 정책으로 승인하여 이미 지난 날짜를
