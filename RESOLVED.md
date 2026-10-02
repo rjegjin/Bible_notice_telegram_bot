@@ -1,5 +1,15 @@
 # RESOLVED — Bible_notice_telegram_bot
 
+## 2026-10-01 — 무응답 명령·미처리 예외의 오류 표시
+- 내용: command fallback과 기존 Application error_handler를 연결했다.
+- 결과: 알 수 없는 명령과 처리 예외가 Telegram 오류 안내로 반환된다. 비밀정보 비노출·handler 등록 회귀 검증 포함 42 tests 통과.
+- 파일: manager_bot.py, tests/test_manager_bot.py, tests/test_manager_help.py.
+
+## 2026-10-01 — Telegram plan 게시 mhbot 배포
+- 내용: 로컬 검토·승인 기능 배포와 `/plan publish YEAR MONTH` 연결.
+- 결과: 40 tests, 원격 compile/import/hash/service, Telegram 명령 목록과 10월 standby 검증 통과.
+- 파일: manager_bot.py, tools/plan_manager.py, tests/test_manager_bot.py; user service/timer TZ.
+
 완료된 태스크, 해결된 문제, 채택된 제안을 기록한다.
 진행 중인 것은 CONTEXT.md, 실패한 접근법은 DEAD_ENDS.md에 쓴다.
 

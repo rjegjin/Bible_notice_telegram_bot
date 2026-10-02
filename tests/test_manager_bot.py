@@ -44,6 +44,24 @@ class PlanCaptionTests(unittest.TestCase):
 
 
 class ManualSendTests(unittest.TestCase):
+    def test_reviewed_publish_promotes_snapshot_to_runtime_plan(self):
+        from manager_bot import _review_standby, _publish_reviewed_plan
+        from tools.plan_manager import PlanManager
+        from tests.test_plan_manager import valid_july_plan
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            standby = root / 'standby'
+            standby.mkdir()
+            approved = valid_july_plan()
+            (standby / '2026_07.json').write_text(json.dumps(approved))
+            manager = PlanManager(root / 'runtime')
+            with patch('tools.plan_manager.DEFAULT_STANDBY_DIR', standby), patch(
+                'tools.plan_manager.PlanManager', return_value=manager
+            ), patch('tools.plan_manager.upsert_quiet_time_tab', return_value='verified'):
+                _, _, digest = _review_standby(2026, 7)
+                _publish_reviewed_plan(2026, 7, digest)
+            self.assertEqual(manager.load(2026, 7), approved)
+
     def test_review_blocks_changed_standby(self):
         from manager_bot import _review_standby
         from tests.test_plan_manager import valid_july_plan
@@ -69,6 +87,42 @@ class ManualSendTests(unittest.TestCase):
 
 
 class PlanPublishCallbackTests(unittest.IsolatedAsyncioTestCase):
+    async def test_command_errors_are_reported_without_exception_secrets(self):
+        import manager_bot as bot
+        message = SimpleNamespace(reply_text=AsyncMock())
+        with patch('manager_bot.run_bot') as run:
+            bot.main()
+        handler = run.call_args.kwargs.get('error_handler')
+        self.assertIsNotNone(handler, '처리 실패를 Telegram에 표시해야 한다')
+        await handler(SimpleNamespace(effective_message=message), SimpleNamespace(error=RuntimeError('secret-token')))
+        reply = message.reply_text.call_args.args[0]
+        self.assertIn('❌', reply)
+        self.assertIn('RuntimeError', reply)
+        self.assertNotIn('secret-token', reply)
+
+    async def test_unknown_command_gets_help_instead_of_silence(self):
+        import manager_bot as bot
+        with patch('manager_bot.run_bot') as run:
+            bot.main()
+        handlers = run.call_args.args[1]
+        fallback = [handler for handler in handlers if handler.callback.__name__ == 'cmd_unknown']
+        self.assertEqual(len(fallback), 1, '없는 명령도 오류를 표시해야 한다')
+        message = SimpleNamespace(reply_text=AsyncMock())
+        await fallback[0].callback(SimpleNamespace(effective_message=message), None)
+        self.assertIn('/help', message.reply_text.call_args.args[0])
+
+    async def test_plan_publish_command_opens_review(self):
+        from manager_bot import cmd_plan
+        message = SimpleNamespace(reply_text=AsyncMock())
+        update = SimpleNamespace(effective_message=message, effective_chat=SimpleNamespace(id=123))
+        context = SimpleNamespace(args=['publish', '2026', '10'])
+        with patch.dict('os.environ', {'BIBLE_OWNER_CHAT_ID': '123'}), patch(
+            'manager_bot._show_plan_review', new_callable=AsyncMock
+        ) as review:
+            await cmd_plan(update, context)
+        review.assert_awaited_once_with(message, 2026, 10)
+        self.assertEqual(context.args, ['publish', '2026', '10'])
+
     async def test_publish_callback_calls_reviewed_publish_and_reports_success(self):
         from manager_bot import handle_plan_callback
         message = SimpleNamespace(reply_text=AsyncMock())

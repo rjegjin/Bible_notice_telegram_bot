@@ -15,7 +15,7 @@ HELP = SRC[SRC.index('HELP_TEXT = """'):SRC.index('async def cmd_help')]
 
 def test_help_registered():
     assert 'CommandHandler("help",    cmd_help)' in SRC
-    assert "run_bot(TOKEN, handlers, post_init=post_init)" in SRC
+    assert "run_bot(TOKEN, handlers, post_init=post_init, error_handler=on_error)" in SRC
 
 
 def test_help_covers_every_command():

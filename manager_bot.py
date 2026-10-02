@@ -16,6 +16,7 @@ import tempfile
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
@@ -90,6 +91,13 @@ async def cmd_planpublish(update, context):
         await _show_plan_review(update.effective_message, year, month)
     except (ValueError, FileNotFoundError) as error:
         await update.effective_message.reply_text(f"❌ 검토 불가: {error}")
+
+
+async def cmd_plan(update, context):
+    if not context.args or context.args[0].lower() != "publish":
+        await update.effective_message.reply_text("사용법: /plan publish YEAR MONTH (예: /plan publish 2026 10)")
+        return
+    await cmd_planpublish(update, SimpleNamespace(args=context.args[1:]))
 
 
 async def _offer_plan_review(message, year, month, output):
@@ -198,7 +206,7 @@ def _resolve_prayer_day(value, today=None):
 def _album_result_message(commands, outputs):
     if outputs and "✅ standby 생성:" in outputs[-1]:
         saved = "\n".join(f"✅ {kind} 저장 완료" for kind, _, _ in commands)
-        return f"{saved}\n✅ standby JSON 생성 및 월 전체 validation 통과\n⏸ 운영 반영 안 됨 · 검토 후 plan publish 필요"
+        return f"{saved}\n✅ standby JSON 생성 및 월 전체 validation 통과\n⏸ 운영 반영 안 됨 · Telegram 내용 확인 → 승인·게시"
     return f"❌ standby 생성 실패\n{outputs[-1] if outputs else '처리 결과 없음'}"
 
 
@@ -278,7 +286,7 @@ HELP_TEXT = """📖 Bible Notice Bot
   · caption 없이 먼저 올린 뒤 나중에 caption을 **편집**해도 된다
   → standby JSON 생성 + 월 전체 검증까지만 한다.
     내용 확인 → 승인·게시 버튼으로 Docs·운영 반영까지 진행한다.
-    `/planpublish 2026 10` 으로 검토 화면을 다시 열 수 있다.
+    `/plan publish 2026 10` 또는 `/planpublish 2026 10` 으로 검토 화면을 다시 열 수 있다.
 
 ━━ 발송 ━━
 /send [YYYY-MM-DD] [all|ko|en|mn|owner]
@@ -690,6 +698,7 @@ async def post_init(app):
             BotCommand("qt", "월간 QT 계획표 이미지 등록 안내"),
             BotCommand("br", "월간 BR 계획표 이미지 등록 안내"),
             BotCommand("planpublish", "월간 plan 검토·승인·게시"),
+            BotCommand("plan", "월간 plan 게시 (/plan publish YEAR MONTH)"),
             BotCommand("prayerpreview", "저장된 기도제목 검토"),
             BotCommand("prayerapprove", "기도제목 승인"),
             BotCommand("prayerday", "요일 기도제목 재호출"),
@@ -699,6 +708,21 @@ async def post_init(app):
         ])
     except Exception:
         log.exception("명령 목록 등록 실패 — 봇 동작에는 영향 없음")
+
+
+async def cmd_unknown(update, context):
+    await update.effective_message.reply_text("❌ 알 수 없는 명령어입니다. /help에서 사용법을 확인해주세요.")
+
+
+async def on_error(update, context):
+    error_type = type(context.error).__name__
+    log.error("Telegram 명령 처리 실패: %s", error_type)
+    message = getattr(update, "effective_message", None)
+    if message is not None:
+        try:
+            await message.reply_text(f"❌ 명령 처리 실패 ({error_type})\n잠시 후 다시 시도해주세요. 사용법은 /help에서 확인할 수 있습니다.")
+        except Exception as error:
+            log.warning("오류 안내 전송 실패: %s", type(error).__name__)
 
 
 def main():
@@ -714,6 +738,7 @@ def main():
         CommandHandler("qt", cmd_plan_image),
         CommandHandler("br", cmd_plan_image),
         CommandHandler("planpublish", cmd_planpublish),
+        CommandHandler("plan", cmd_plan),
         CommandHandler("prayerapprove", cmd_prayerapprove),
         CommandHandler("prayerpreview", cmd_prayerpreview),
         CommandHandler("prayerday", cmd_prayerday),
@@ -725,8 +750,9 @@ def main():
             handle_prayer_image,
         ),
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_menu),
+        MessageHandler(filters.COMMAND, cmd_unknown),
     ]
-    run_bot(TOKEN, handlers, post_init=post_init)
+    run_bot(TOKEN, handlers, post_init=post_init, error_handler=on_error)
 
 if __name__ == "__main__":
     main()

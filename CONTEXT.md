@@ -1,5 +1,13 @@
 # CONTEXT — Bible Notice Telegram Bot
 
+## 2026-10-01 — Telegram 명령 오류 안내
+- [완료] 알 수 없는 명령은 `/help` 안내, 처리되지 않은 예외는 오류 종류를 Telegram에 표시한다. 공통 run_bot의 기존 error_handler 인자를 재사용하며 예외 원문의 인증정보는 표시하지 않는다.
+- [검증] focused tests 42개와 compile 통과. 변경은 manager_bot.py·관련 tests에 한정한다.
+
+## 2026-10-01 — Telegram 게시 운영 반영
+- [완료] 검토·승인·게시 및 `/plan publish YEAR MONTH` alias를 mhbot에 배포. 40 tests, Telegram 명령 readback, 10월 standby 31일 validation 통과.
+- [운영] manager TZ=Asia/Seoul, daily timer 06:00 Asia/Seoul. 실제 월 plan 승인·그룹 발송은 하지 않았다.
+
 ## 2026-09-30 — Telegram 월별 plan 게시
 
 - [구현] 업로드 결과의 내용 확인 → 승인·게시 버튼 및 `/planpublish YEAR MONTH`를 연결했다.
